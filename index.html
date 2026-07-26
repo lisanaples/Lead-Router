@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lead Router Prototype</title>
+    <meta name="theme-color" content="#123846" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">LR</div>
+          <div>
+            <strong>Lead Router</strong>
+            <span>First-to-claim lead desk</span>
+          </div>
+        </div>
+        <nav class="nav-list" aria-label="Lead router sections">
+          <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" type="button" data-view="inbox">Lead Inbox</button>
+          <button class="nav-item" type="button" data-view="team">Team</button>
+          <button class="nav-item" type="button" data-view="settings">Settings</button>
+        </nav>
+        <section class="sidebar-panel">
+          <span>Prototype mode</span>
+          <p>This version saves in this browser and simulates texts/notifications.</p>
+        </section>
+      </aside>
+
+      <section class="main">
+        <header class="topbar">
+          <div>
+            <span class="eyebrow">Lead response</span>
+            <h1>Claim the right lead fast</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="ghost-button" type="button" id="exportButton">Export</button>
+            <label class="import-button">
+              Import
+              <input id="importInput" type="file" accept="application/json" />
+            </label>
+            <button class="primary-button" type="button" id="openLeadForm">Add lead</button>
+          </div>
+        </header>
+
+        <section class="view active" id="dashboardView">
+          <section class="metrics-grid" id="metricsGrid"></section>
+          <section class="desk-layout">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <span class="eyebrow">Now</span>
+                  <h2>Unclaimed Leads</h2>
+                </div>
+                <span class="count-pill" id="unclaimedCount">0</span>
+              </div>
+              <div class="lead-list" id="unclaimedLeads"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <span class="eyebrow">Assigned</span>
+                  <h2>Claimed Leads</h2>
+                </div>
+                <span class="count-pill" id="claimedCount">0</span>
+              </div>
+              <div class="lead-list compact" id="claimedLeads"></div>
+            </article>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Activity</span>
+                <h2>Lead Timeline</h2>
+              </div>
+            </div>
+            <div class="activity-log" id="activityLog"></div>
+          </section>
+        </section>
+
+        <section class="view" id="inboxView">
+          <section class="panel intake-panel">
+            <div>
+              <span class="eyebrow">Email parser</span>
+              <h2>Paste a lead email</h2>
+              <p>Paste a Zillow, Realtor.com, Homes.com, or website lead email. The prototype will pull out likely contact details.</p>
+            </div>
+            <textarea id="leadEmailText" placeholder="Paste lead email text here..."></textarea>
+            <div class="button-row">
+              <button class="primary-button" type="button" id="parseEmailButton">Create lead from email</button>
+              <button class="ghost-button" type="button" id="loadSampleButton">Load sample</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">All leads</span>
+                <h2>Lead Inbox</h2>
+              </div>
+              <div class="filter-row">
+                <input id="leadSearch" type="search" placeholder="Search leads..." />
+                <select id="leadStatusFilter">
+                  <option value="all">All statuses</option>
+                  <option value="new">Unclaimed</option>
+                  <option value="claimed">Claimed</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="appointment">Appointment set</option>
+                  <option value="nurture">Nurture</option>
+                  <option value="closed">Closed out</option>
+                </select>
+              </div>
+            </div>
+            <div class="lead-table" id="leadTable"></div>
+          </section>
+        </section>
+
+        <section class="view" id="teamView">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Recipients</span>
+                <h2>Team Members</h2>
+              </div>
+              <button class="primary-button" type="button" id="addTeamMember">Add team member</button>
+            </div>
+            <div class="team-grid" id="teamGrid"></div>
+          </section>
+        </section>
+
+        <section class="view" id="settingsView">
+          <section class="panel settings-grid">
+            <div>
+              <span class="eyebrow">Routing rules</span>
+              <h2>How this should work later</h2>
+              <p>The first real version would connect an email inbox, parse new lead emails, send text alerts to active team members, and lock the lead to the first person who claims it.</p>
+            </div>
+            <div class="settings-card">
+              <strong>Notification text</strong>
+              <textarea id="notificationTemplate"></textarea>
+            </div>
+            <div class="settings-card">
+              <strong>Claim rules</strong>
+              <label><input id="allowReclaim" type="checkbox" /> Allow admin to reassign claimed leads</label>
+              <label><input id="notifyAll" type="checkbox" checked /> Notify all active team members</label>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="leadDialog">
+      <form class="dialog-panel" id="leadForm" method="dialog">
+        <button class="close-button" type="button" data-close-dialog>x</button>
+        <div>
+          <span class="eyebrow">Lead details</span>
+          <h2 id="leadDialogTitle">Add Lead</h2>
+        </div>
+        <input name="leadId" type="hidden" />
+        <div class="form-grid">
+          <label>Lead source <input name="source" placeholder="Zillow, Realtor.com, website..." required /></label>
+          <label>Lead type
+            <select name="type">
+              <option>Buyer</option>
+              <option>Seller</option>
+              <option>Investor</option>
+              <option>Rental</option>
+            </select>
+          </label>
+          <label>Client name <input name="name" placeholder="Client name" required /></label>
+          <label>Phone <input name="phone" placeholder="Phone number" /></label>
+          <label>Email <input name="email" type="email" placeholder="Email address" /></label>
+          <label>Area or property <input name="property" placeholder="Address, city, or area" /></label>
+          <label>Price range <input name="price" placeholder="$400K-$500K" /></label>
+          <label>Urgency
+            <select name="urgency">
+              <option>Hot</option>
+              <option>Warm</option>
+              <option>Nurture</option>
+            </select>
+          </label>
+        </div>
+        <label>Message <textarea name="message" placeholder="Original message or notes..."></textarea></label>
+        <button class="primary-button" type="submit">Save lead</button>
+      </form>
+    </dialog>
+
+    <dialog id="teamDialog">
+      <form class="dialog-panel" id="teamForm" method="dialog">
+        <button class="close-button" type="button" data-close-dialog>x</button>
+        <div>
+          <span class="eyebrow">Team recipient</span>
+          <h2>Add Team Member</h2>
+        </div>
+        <div class="form-grid">
+          <label>Name <input name="name" required placeholder="Agent name" /></label>
+          <label>Cell phone <input name="phone" placeholder="Text number" /></label>
+          <label>Email <input name="email" type="email" placeholder="Email" /></label>
+          <label>Status
+            <select name="active">
+              <option value="true">Active</option>
+              <option value="false">Paused</option>
+            </select>
+          </label>
+        </div>
+        <button class="primary-button" type="submit">Save team member</button>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+    <script>
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        navigator.serviceWorker.register("service-worker.js");
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "Lead Router",
+  "short_name": "Lead Router",
+  "description": "A first-to-claim real estate lead routing prototype.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f6f8f8",
+  "theme_color": "#123846"
+}
