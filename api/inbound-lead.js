@@ -1,5 +1,6 @@
 const {
   getWorkspace,
+  handleOptions,
   leadFromPayload,
   notifyActiveTeam,
   parseBody,
@@ -15,6 +16,8 @@ function isAuthorized(request) {
 }
 
 module.exports = async function handler(request, response) {
+  if (handleOptions(request, response)) return;
+
   if (request.method === "GET") {
     response.status(200).json({
       ok: true,

@@ -1,11 +1,14 @@
 const {
   getWorkspace,
+  handleOptions,
   parseBody,
   readBody,
   saveWorkspace,
 } = require("./_lead-router-lib");
 
 module.exports = async function handler(request, response) {
+  if (handleOptions(request, response)) return;
+
   if (request.method !== "POST") {
     response.status(405).json({ ok: false, error: "Use POST to save a push subscription." });
     return;

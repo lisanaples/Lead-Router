@@ -1,12 +1,15 @@
 const {
   claimLead,
   getWorkspace,
+  handleOptions,
   parseBody,
   readBody,
   saveWorkspace,
 } = require("./_lead-router-lib");
 
 module.exports = async function handler(request, response) {
+  if (handleOptions(request, response)) return;
+
   if (!["GET", "POST"].includes(request.method)) {
     response.status(405).json({ ok: false, error: "Use GET or POST to claim a lead." });
     return;

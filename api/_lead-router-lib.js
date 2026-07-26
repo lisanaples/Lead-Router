@@ -11,6 +11,21 @@ function optionalEnv(name) {
   return process.env[name] || "";
 }
 
+function setCors(response) {
+  response.setHeader("Access-Control-Allow-Origin", "*");
+  response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  response.setHeader("Access-Control-Allow-Headers", "Content-Type, x-lead-router-secret");
+}
+
+function handleOptions(request, response) {
+  setCors(response);
+  if (request.method === "OPTIONS") {
+    response.status(204).end();
+    return true;
+  }
+  return false;
+}
+
 function appUrl() {
   return optionalEnv("LEAD_ROUTER_APP_URL") || "https://lead-router-29yb.vercel.app";
 }
@@ -236,6 +251,7 @@ function claimLead(workspace, leadId, owner) {
 module.exports = {
   claimLead,
   getWorkspace,
+  handleOptions,
   leadFromPayload,
   notifyActiveTeam,
   optionalEnv,
