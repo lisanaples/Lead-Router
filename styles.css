@@ -144,6 +144,48 @@ button {
   margin-bottom: 22px;
 }
 
+.sync-panel {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(320px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  border: 1px solid rgba(216, 225, 229, 0.92);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.sync-panel strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.sync-panel p {
+  font-size: 0.82rem;
+}
+
+.auth-form,
+.sync-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.auth-form input {
+  min-width: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 h1,
 h2,
 p {
@@ -511,6 +553,10 @@ label {
     grid-template-columns: 1fr;
   }
 
+  .sync-panel {
+    grid-template-columns: 1fr;
+  }
+
   .sidebar {
     position: sticky;
     top: 0;
@@ -548,12 +594,20 @@ label {
   }
 
   .topbar,
+  .sync-panel,
   .topbar-actions,
   .panel-header,
   .button-row,
   .filter-row {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .auth-form,
+  .sync-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .nav-list {

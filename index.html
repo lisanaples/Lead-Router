@@ -6,7 +6,7 @@
     <title>Lead Router Prototype</title>
     <meta name="theme-color" content="#123846" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="styles.css?v=2" />
   </head>
   <body>
     <main class="app-shell">
@@ -45,6 +45,25 @@
             <button class="primary-button" type="button" id="openLeadForm">Add lead</button>
           </div>
         </header>
+
+        <section class="sync-panel">
+          <div>
+            <span class="eyebrow">Shared workspace</span>
+            <strong id="syncStatus">Local mode</strong>
+            <p id="syncHelper">Sign in to share leads and claims with the team.</p>
+          </div>
+          <form class="auth-form" id="authForm">
+            <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
+            <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" />
+            <button class="ghost-button" type="submit">Sign in</button>
+            <button class="primary-button" type="button" id="createAccountButton">Create account</button>
+          </form>
+          <div class="sync-actions">
+            <button class="ghost-button" type="button" id="refreshCloudButton">Refresh cloud data</button>
+            <button class="primary-button" type="button" id="uploadCloudButton">Upload local data</button>
+            <button class="ghost-button" type="button" id="signOutButton">Sign out</button>
+          </div>
+        </section>
 
         <section class="view active" id="dashboardView">
           <section class="metrics-grid" id="metricsGrid"></section>
@@ -213,7 +232,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js"></script>
+    <script src="app.js?v=2"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");

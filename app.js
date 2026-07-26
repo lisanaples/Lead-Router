@@ -1,6 +1,10 @@
 const LEADS_KEY = "lead-router-leads-v1";
 const TEAM_KEY = "lead-router-team-v1";
 const SETTINGS_KEY = "lead-router-settings-v1";
+const CLOUD_SESSION_KEY = "lead-router-cloud-session-v1";
+const SUPABASE_URL = "https://agmmravjjeaqdpbvbyqn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_AuIT60GWzMHHhtr7MKIH-Q_AFVs8PnE";
+const CLOUD_RECORD_ID = "lead-router-shared-workspace";
 
 const sampleLeads = [
   {
@@ -60,6 +64,7 @@ let settings = loadJson(SETTINGS_KEY, defaultSettings);
 let activeView = "dashboard";
 let searchTerm = "";
 let statusFilter = "all";
+let cloudSession = loadCloudSession();
 
 function minutesAgo(value) {
   return new Date(Date.now() - value * 60000).toISOString();
@@ -74,10 +79,122 @@ function loadJson(key, fallback) {
   }
 }
 
+function loadCloudSession() {
+  try {
+    const saved = localStorage.getItem(CLOUD_SESSION_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCloudSession(session) {
+  cloudSession = session;
+  if (session?.access_token) localStorage.setItem(CLOUD_SESSION_KEY, JSON.stringify(session));
+  else localStorage.removeItem(CLOUD_SESSION_KEY);
+  renderSyncStatus();
+}
+
 function saveAll() {
   localStorage.setItem(LEADS_KEY, JSON.stringify(leads));
   localStorage.setItem(TEAM_KEY, JSON.stringify(team));
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function localSnapshot() {
+  return { leads, team, settings };
+}
+
+function applySnapshot(snapshot) {
+  if (!snapshot) return;
+  leads = Array.isArray(snapshot.leads) ? snapshot.leads : leads;
+  team = Array.isArray(snapshot.team) ? snapshot.team : team;
+  settings = snapshot.settings || settings;
+  saveAndSync();
+  renderAll();
+}
+
+async function supabaseRequest(path, options = {}) {
+  const headers = {
+    apikey: SUPABASE_KEY,
+    "Content-Type": "application/json",
+    ...(options.headers || {}),
+  };
+  if (cloudSession?.access_token) headers.Authorization = `Bearer ${cloudSession.access_token}`;
+  const response = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) throw new Error(data?.msg || data?.message || "Supabase request failed.");
+  return data;
+}
+
+async function signIn(email, password) {
+  const data = await supabaseRequest("/auth/v1/token?grant_type=password", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  saveCloudSession(data);
+  await refreshFromCloud({ silent: true });
+  showToast("Signed in and refreshed cloud data.");
+}
+
+async function createAccount(email, password) {
+  const data = await supabaseRequest("/auth/v1/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  if (data?.access_token) {
+    saveCloudSession(data);
+    await syncCloudSnapshot();
+    showToast("Account created and local leads uploaded.");
+  } else {
+    showToast("Account created. Check your email if Supabase asks you to confirm it.");
+  }
+}
+
+async function refreshFromCloud(options = {}) {
+  if (!cloudSession?.access_token) {
+    if (!options.silent) showToast("Sign in first to refresh cloud data.");
+    return;
+  }
+  try {
+    const rows = await supabaseRequest(`/rest/v1/lead_router_records?id=eq.${encodeURIComponent(CLOUD_RECORD_ID)}&select=data&limit=1`);
+    if (rows?.[0]?.data) {
+      applySnapshot(rows[0].data);
+      if (!options.silent) showToast("Cloud data refreshed.");
+    } else if (!options.silent) {
+      showToast("No cloud data yet. Upload local data to start.");
+    }
+  } catch (error) {
+    showToast(`Refresh failed: ${error.message}`);
+  }
+}
+
+async function syncCloudSnapshot(options = {}) {
+  if (!cloudSession?.access_token) {
+    if (!options.silent) showToast("Sign in first to upload local data.");
+    return;
+  }
+  try {
+    await supabaseRequest("/rest/v1/lead_router_records?on_conflict=id", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        id: CLOUD_RECORD_ID,
+        record_type: "workspace",
+        data: localSnapshot(),
+      }),
+    });
+    renderSyncStatus();
+    if (!options.silent) showToast("Local lead data uploaded to Supabase.");
+  } catch (error) {
+    showToast(`Upload failed: ${error.message}`);
+  }
+}
+
+function saveAndSync(options = {}) {
+  saveAndSync();
+  if (cloudSession?.access_token) syncCloudSnapshot({ silent: options.silent !== false });
 }
 
 function escapeHtml(value) {
@@ -278,6 +395,18 @@ function renderSettings() {
   document.querySelector("#notifyAll").checked = settings.notifyAll;
 }
 
+function renderSyncStatus() {
+  const signedIn = Boolean(cloudSession?.access_token);
+  document.querySelector("#syncStatus").textContent = signedIn ? "Connected to Supabase" : "Local mode";
+  document.querySelector("#syncHelper").textContent = signedIn
+    ? "Cloud sharing is on. Refresh before working, and upload after local imports."
+    : "Sign in to share leads and claims with the team.";
+  document.querySelector("#authForm").classList.toggle("hidden", signedIn);
+  document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn);
+  document.querySelector("#refreshCloudButton").disabled = !signedIn;
+  document.querySelector("#uploadCloudButton").disabled = !signedIn;
+}
+
 function emptyState(text) {
   return `<div class="empty-state">${text}</div>`;
 }
@@ -288,6 +417,7 @@ function renderAll() {
   renderInbox();
   renderTeam();
   renderSettings();
+  renderSyncStatus();
 }
 
 function switchView(view) {
@@ -345,7 +475,7 @@ function saveLead(form) {
     leads.unshift(lead);
     broadcastLead(lead);
   }
-  saveAll();
+  saveAndSync();
   form.reset();
   document.querySelector("#leadDialog").close();
   renderAll();
@@ -364,7 +494,7 @@ function claimLead(leadId, memberId) {
   lead.assignedTo = member.name;
   member.claims = (member.claims || 0) + 1;
   addActivity(lead, `${member.name} claimed the lead.`);
-  saveAll();
+  saveAndSync();
   renderAll();
   showToast(`${member.name} claimed ${lead.name}.`);
 }
@@ -374,7 +504,7 @@ function updateLeadStatus(leadId, status) {
   if (!lead) return;
   lead.status = status;
   addActivity(lead, `Status changed to ${statusLabel(status)}.`);
-  saveAll();
+  saveAndSync();
   renderAll();
   showToast("Lead status updated.");
 }
@@ -451,7 +581,7 @@ function importData(file) {
       leads = Array.isArray(data.leads) ? data.leads : leads;
       team = Array.isArray(data.team) ? data.team : team;
       settings = data.settings || settings;
-      saveAll();
+      saveAndSync({ silent: false });
       renderAll();
       showToast("Lead router data imported.");
     } catch {
@@ -516,17 +646,51 @@ document.querySelector("#exportButton").addEventListener("click", exportData);
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importData(event.target.files[0]);
 });
+document.querySelector("#authForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.querySelector("#authEmail").value.trim();
+  const password = document.querySelector("#authPassword").value;
+  if (!email || !password) {
+    showToast("Enter an email and password.");
+    return;
+  }
+  try {
+    await signIn(email, password);
+  } catch (error) {
+    showToast(`Sign in failed: ${error.message}`);
+  }
+});
+document.querySelector("#createAccountButton").addEventListener("click", async () => {
+  const email = document.querySelector("#authEmail").value.trim();
+  const password = document.querySelector("#authPassword").value;
+  if (!email || !password) {
+    showToast("Enter an email and password first.");
+    return;
+  }
+  try {
+    await createAccount(email, password);
+  } catch (error) {
+    showToast(`Account could not be created: ${error.message}`);
+  }
+});
+document.querySelector("#refreshCloudButton").addEventListener("click", () => refreshFromCloud());
+document.querySelector("#uploadCloudButton").addEventListener("click", () => syncCloudSnapshot());
+document.querySelector("#signOutButton").addEventListener("click", () => {
+  saveCloudSession(null);
+  showToast("Signed out. This browser is back in local mode.");
+});
 document.querySelector("#notificationTemplate").addEventListener("change", (event) => {
   settings.notificationTemplate = event.target.value;
-  saveAll();
+  saveAndSync();
 });
 document.querySelector("#allowReclaim").addEventListener("change", (event) => {
   settings.allowReclaim = event.target.checked;
-  saveAll();
+  saveAndSync();
 });
 document.querySelector("#notifyAll").addEventListener("change", (event) => {
   settings.notifyAll = event.target.checked;
-  saveAll();
+  saveAndSync();
 });
 
 renderAll();
+if (cloudSession?.access_token) refreshFromCloud({ silent: true });

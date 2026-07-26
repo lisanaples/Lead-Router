@@ -12,7 +12,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Saves data in this browser.
 - Supports export/import backup.
 - Includes installable-app starter files for later hosting.
-- Includes a separate Supabase setup file for future shared data.
+- Includes Supabase sign-in and shared team cloud data.
 
 ## What to do next
 
@@ -22,7 +22,8 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 4. Create a new Vercel project connected to that repo.
 5. Create a separate Supabase project for this app.
 6. Run `supabase-setup.sql` in the new Supabase project.
-7. Add sign-in and cloud sync to connect this app to Supabase.
+7. Upload the updated files to GitHub and let Vercel redeploy.
+8. Sign in inside the app, then use **Upload local data** once to seed the shared cloud workspace.
 
 ## What a real connected version would need
 
