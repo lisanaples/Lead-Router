@@ -6,7 +6,7 @@
     <title>Lead Router Prototype</title>
     <meta name="theme-color" content="#123846" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=3" />
+    <link rel="stylesheet" href="styles.css?v=5" />
   </head>
   <body>
     <main class="app-shell">
@@ -20,9 +20,11 @@
         </div>
         <nav class="nav-list" aria-label="Lead router sections">
           <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+          <button class="nav-item" type="button" data-view="myLeads">My Leads</button>
           <button class="nav-item" type="button" data-view="inbox">Lead Inbox</button>
           <button class="nav-item" type="button" data-view="workflow">Workflow</button>
-          <button class="nav-item" type="button" data-view="team">Team</button>
+          <button class="nav-item" type="button" data-view="reports">Reports</button>
+          <button class="nav-item master-only" type="button" data-view="team">Team</button>
           <button class="nav-item" type="button" data-view="settings">Settings</button>
         </nav>
         <section class="sidebar-panel">
@@ -43,11 +45,11 @@
               Import
               <input id="importInput" type="file" accept="application/json" />
             </label>
-            <label class="import-button">
+            <label class="import-button master-only">
               Import FiveStreet CSV
               <input id="csvImportInput" type="file" accept=".csv,text/csv" />
             </label>
-            <button class="primary-button" type="button" id="openLeadForm">Add lead</button>
+            <button class="primary-button master-only" type="button" id="openLeadForm">Add lead</button>
           </div>
         </header>
 
@@ -57,6 +59,15 @@
             <strong id="syncStatus">Local mode</strong>
             <p id="syncHelper">Sign in to share leads and claims with the team.</p>
           </div>
+          <label class="work-as-control">Working as
+            <select id="myOwnerSelect"></select>
+          </label>
+          <label class="work-as-control">Account type
+            <select id="accountRoleSelect">
+              <option value="master">Master account</option>
+              <option value="team">Team member account</option>
+            </select>
+          </label>
           <form class="auth-form" id="authForm">
             <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
             <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" />
@@ -107,6 +118,56 @@
           </section>
         </section>
 
+        <section class="view" id="myLeadsView">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Personal desk</span>
+                <h2>My Leads</h2>
+                <p>Work your assigned leads by urgency, response stage, and follow-up date.</p>
+              </div>
+              <button class="ghost-button" type="button" id="downloadMyLeads">Download my leads</button>
+            </div>
+            <section class="my-leads-grid">
+              <article class="pipeline-column-card">
+                <div class="section-title">
+                  <h3>Due today</h3>
+                  <span id="myDueCount">0</span>
+                </div>
+                <div class="lead-list compact" id="myDueLeads"></div>
+              </article>
+              <article class="pipeline-column-card">
+                <div class="section-title">
+                  <h3>New / not contacted</h3>
+                  <span id="myNewCount">0</span>
+                </div>
+                <div class="lead-list compact" id="myNewLeads"></div>
+              </article>
+              <article class="pipeline-column-card">
+                <div class="section-title">
+                  <h3>Hot</h3>
+                  <span id="myHotCount">0</span>
+                </div>
+                <div class="lead-list compact" id="myHotLeads"></div>
+              </article>
+              <article class="pipeline-column-card">
+                <div class="section-title">
+                  <h3>Contacted, no appointment</h3>
+                  <span id="myContactedCount">0</span>
+                </div>
+                <div class="lead-list compact" id="myContactedLeads"></div>
+              </article>
+              <article class="pipeline-column-card">
+                <div class="section-title">
+                  <h3>Nurture</h3>
+                  <span id="myNurtureCount">0</span>
+                </div>
+                <div class="lead-list compact" id="myNurtureLeads"></div>
+              </article>
+            </section>
+          </section>
+        </section>
+
         <section class="view" id="inboxView">
           <section class="panel intake-panel">
             <div>
@@ -136,10 +197,15 @@
                   <option value="all">All statuses</option>
                   <option value="new">Unclaimed</option>
                   <option value="claimed">Claimed</option>
+                  <option value="attempted">Contact attempted</option>
                   <option value="contacted">Contacted</option>
                   <option value="appointment">Appointment set</option>
+                  <option value="consultation">Consultation completed</option>
+                  <option value="converted">Converted</option>
                   <option value="nurture">Nurture</option>
-                  <option value="closed">Closed out</option>
+                  <option value="doNotContact">Do not contact</option>
+                  <option value="lost">Lost</option>
+                  <option value="closed">Closed sale</option>
                 </select>
               </div>
             </div>
@@ -176,6 +242,31 @@
                 <div class="owner-pipeline" id="ownerPipeline"></div>
               </article>
             </section>
+          </section>
+        </section>
+
+        <section class="view" id="reportsView">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Reports</span>
+                <h2>Weekly Check-Ins</h2>
+                <p>Leads with follow-ups due this week, overdue, or missing a next step.</p>
+              </div>
+              <button class="ghost-button" type="button" id="downloadReportButton">Download report</button>
+            </div>
+            <section class="metrics-grid report-metrics" id="reportMetrics"></section>
+            <div class="report-table" id="weeklyCheckInReport"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <span class="eyebrow">Overall stats</span>
+                <h2>Lead Funnel</h2>
+              </div>
+            </div>
+            <div class="report-grid" id="overallStatsReport"></div>
           </section>
         </section>
 
@@ -251,10 +342,15 @@
             <select name="status">
               <option value="new">Unclaimed</option>
               <option value="claimed">Claimed</option>
+              <option value="attempted">Contact attempted</option>
               <option value="contacted">Contacted</option>
               <option value="appointment">Appointment set</option>
+              <option value="consultation">Consultation completed</option>
+              <option value="converted">Converted</option>
               <option value="nurture">Nurture</option>
-              <option value="closed">Closed out</option>
+              <option value="doNotContact">Do not contact</option>
+              <option value="lost">Lost</option>
+              <option value="closed">Closed sale</option>
             </select>
           </label>
           <label>Owner
@@ -262,6 +358,21 @@
           </label>
           <label>Next follow-up date <input name="nextFollowUpDate" type="date" /></label>
         </div>
+        <section class="tracking-section">
+          <div class="section-title">
+            <h3>Response tracking</h3>
+            <span>Milestones</span>
+          </div>
+          <div class="form-grid">
+            <label>First contact attempted <input name="firstAttemptedAt" type="date" /></label>
+            <label>First contact made <input name="firstContactedAt" type="date" /></label>
+            <label>Appointment set <input name="appointmentSetAt" type="date" /></label>
+            <label>Consultation completed <input name="consultationCompletedAt" type="date" /></label>
+            <label>Converted to client <input name="convertedAt" type="date" /></label>
+            <label>Lost date <input name="lostAt" type="date" /></label>
+          </div>
+          <label>Lost reason / conversion notes <input name="outcomeNotes" placeholder="Not ready, bought with another agent, converted, etc." /></label>
+        </section>
         <label>Message <textarea name="message" placeholder="Original message or notes..."></textarea></label>
         <button class="primary-button" type="submit">Save lead</button>
       </form>
@@ -295,7 +406,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=5"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");

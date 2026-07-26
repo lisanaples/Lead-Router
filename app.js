@@ -2,6 +2,8 @@ const LEADS_KEY = "lead-router-leads-v1";
 const TEAM_KEY = "lead-router-team-v1";
 const SETTINGS_KEY = "lead-router-settings-v1";
 const CLOUD_SESSION_KEY = "lead-router-cloud-session-v1";
+const MY_OWNER_KEY = "lead-router-my-owner-v1";
+const ACCOUNT_ROLE_KEY = "lead-router-account-role-v1";
 const SUPABASE_URL = "https://agmmravjjeaqdpbvbyqn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_AuIT60GWzMHHhtr7MKIH-Q_AFVs8PnE";
 const CLOUD_RECORD_ID = "lead-router-shared-workspace";
@@ -10,9 +12,13 @@ const ROUTING_STATUSES = ["Available", "On call"];
 const PIPELINE_GROUPS = [
   { key: "hot", label: "Hot" },
   { key: "warm", label: "Warm" },
+  { key: "attempted", label: "Attempted" },
   { key: "contacted", label: "Contacted" },
-  { key: "nurture", label: "Nurture / Cold" },
   { key: "appointment", label: "Appointment set" },
+  { key: "consultation", label: "Consultation" },
+  { key: "converted", label: "Converted" },
+  { key: "nurture", label: "Nurture / Cold" },
+  { key: "doNotContact", label: "Do not contact" },
 ];
 
 const sampleLeads = [
@@ -75,6 +81,8 @@ let searchTerm = "";
 let statusFilter = "all";
 let ownerFilter = "all";
 let workflowOwner = "";
+let myOwner = localStorage.getItem(MY_OWNER_KEY) || "";
+let accountRole = localStorage.getItem(ACCOUNT_ROLE_KEY) || "master";
 let cloudSession = loadCloudSession();
 
 team = team.map((member) => ({
@@ -84,8 +92,16 @@ team = team.map((member) => ({
 leads = leads.map((lead) => ({
   ...lead,
   nextFollowUpDate: lead.nextFollowUpDate || "",
+  firstAttemptedAt: lead.firstAttemptedAt || "",
+  firstContactedAt: lead.firstContactedAt || "",
+  appointmentSetAt: lead.appointmentSetAt || "",
+  consultationCompletedAt: lead.consultationCompletedAt || "",
+  convertedAt: lead.convertedAt || "",
+  lostAt: lead.lostAt || "",
+  outcomeNotes: lead.outcomeNotes || "",
 }));
 workflowOwner = team[0]?.name || "";
+myOwner = team.some((member) => member.name === myOwner) ? myOwner : team[0]?.name || "";
 
 function minutesAgo(value) {
   return new Date(Date.now() - value * 60000).toISOString();
@@ -245,6 +261,12 @@ function dateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
+function weekEndKey() {
+  const end = new Date();
+  end.setDate(end.getDate() + (6 - end.getDay()));
+  return dateKey(end);
+}
+
 function leadAge(value) {
   const minutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60000));
   if (minutes < 60) return `${minutes}m ago`;
@@ -257,12 +279,44 @@ function statusLabel(status) {
   const labels = {
     new: "Unclaimed",
     claimed: "Claimed",
+    attempted: "Contact attempted",
     contacted: "Contacted",
     appointment: "Appointment set",
+    consultation: "Consultation completed",
+    converted: "Converted",
     nurture: "Nurture",
-    closed: "Closed out",
+    doNotContact: "Do not contact",
+    lost: "Lost",
+    closed: "Closed sale",
   };
   return labels[status] || status;
+}
+
+function visibleLeads() {
+  if (accountRole === "team") return leads.filter((lead) => lead.assignedTo === myOwner);
+  return leads;
+}
+
+function canManageAll() {
+  return accountRole === "master";
+}
+
+function applyAccountAccess() {
+  document.querySelector("#accountRoleSelect").value = accountRole;
+  document.querySelectorAll(".master-only").forEach((element) => {
+    element.classList.toggle("hidden", !canManageAll());
+  });
+  if (!canManageAll() && ["team"].includes(activeView)) switchView("myLeads");
+}
+
+function latestResponseLabel(lead) {
+  if (lead.convertedAt) return `Converted ${dateOnlyLabel(lead.convertedAt)}`;
+  if (lead.lostAt) return `Lost ${dateOnlyLabel(lead.lostAt)}`;
+  if (lead.consultationCompletedAt) return `Consultation ${dateOnlyLabel(lead.consultationCompletedAt)}`;
+  if (lead.appointmentSetAt) return `Appointment ${dateOnlyLabel(lead.appointmentSetAt)}`;
+  if (lead.firstContactedAt) return `Contacted ${dateOnlyLabel(lead.firstContactedAt)}`;
+  if (lead.firstAttemptedAt) return `Attempted ${dateOnlyLabel(lead.firstAttemptedAt)}`;
+  return "No response tracked";
 }
 
 function teamMemberStatus(member) {
@@ -342,20 +396,26 @@ function leadCard(lead, compact = false) {
         <span>${leadAge(lead.createdAt)}</span>
         <span>${assigned}</span>
         <span>${followUp}</span>
+        <span>${latestResponseLabel(lead)}</span>
       </div>
       ${compact ? "" : `<p>${escapeHtml(lead.message || "No message yet.")}</p>`}
       <div class="lead-actions">
         ${lead.status === "new" ? claimButtons(lead) : ""}
         <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Edit</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
         <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="contacted">Contacted</button>
         <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="appointment">Appointment</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="consultation">Consultation</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="converted">Converted</button>
         <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="nurture">Nurture</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="lost">Lost</button>
       </div>
     </article>
   `;
 }
 
 function claimButtons(lead) {
+  if (!canManageAll()) return "";
   const members = activeTeam();
   if (!members.length) return `<button class="ghost-button" type="button" disabled>No active agents</button>`;
   return members.map((member) => `
@@ -374,21 +434,25 @@ function metricCard(label, value, helper) {
 }
 
 function renderMetrics() {
-  const unclaimed = leads.filter((lead) => lead.status === "new").length;
-  const claimed = leads.filter((lead) => lead.status !== "new" && lead.status !== "closed").length;
-  const appointments = leads.filter((lead) => lead.status === "appointment").length;
-  const hot = leads.filter((lead) => lead.urgency === "Hot" && lead.status !== "closed").length;
+  const scope = visibleLeads();
+  const unclaimed = scope.filter((lead) => lead.status === "new").length;
+  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact"].includes(lead.status)).length;
+  const appointments = scope.filter((lead) => lead.status === "appointment").length;
+  const hot = scope.filter((lead) => lead.urgency === "Hot" && lead.status !== "closed").length;
+  const converted = scope.filter((lead) => lead.status === "converted").length;
   document.querySelector("#metricsGrid").innerHTML = [
     metricCard("Unclaimed", unclaimed, "Needs response"),
     metricCard("Claimed active", claimed, "Being worked"),
     metricCard("Appointments", appointments, "Set from leads"),
     metricCard("Hot leads", hot, "High priority"),
+    metricCard("Converted", converted, "Became clients"),
   ].join("");
 }
 
 function renderDashboard() {
-  const unclaimed = leads.filter((lead) => lead.status === "new").sort(sortNewest);
-  const claimed = leads.filter((lead) => lead.status !== "new" && lead.status !== "closed").sort(sortNewest);
+  const scope = visibleLeads();
+  const unclaimed = scope.filter((lead) => lead.status === "new").sort(sortNewest);
+  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact"].includes(lead.status)).sort(sortNewest);
   document.querySelector("#unclaimedCount").textContent = unclaimed.length;
   document.querySelector("#claimedCount").textContent = claimed.length;
   document.querySelector("#unclaimedLeads").innerHTML = unclaimed.length ? unclaimed.map((lead) => leadCard(lead)).join("") : emptyState("No unclaimed leads.");
@@ -397,7 +461,7 @@ function renderDashboard() {
 }
 
 function renderActivityLog() {
-  const rows = leads
+  const rows = visibleLeads()
     .flatMap((lead) => (lead.activity || []).map((activity) => ({ ...activity, lead })))
     .sort((a, b) => new Date(b.at) - new Date(a.at))
     .slice(0, 12);
@@ -416,7 +480,7 @@ function sortNewest(a, b) {
 
 function filteredLeads() {
   const term = searchTerm.trim().toLowerCase();
-  return leads.filter((lead) => {
+  return visibleLeads().filter((lead) => {
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     const matchesOwner = ownerFilter === "all" || String(lead.assignedTo || "") === ownerFilter;
     const haystack = [lead.name, lead.source, lead.type, lead.phone, lead.email, lead.property, lead.price, lead.message, lead.assignedTo]
@@ -457,6 +521,8 @@ function renderTeam() {
 function renderOwnerControls() {
   document.querySelector("#ownerFilter").innerHTML = ownerFilterOptions(ownerFilter);
   document.querySelector("#downloadOwnerSelect").innerHTML = ownerOptions(team[0]?.name || "", false);
+  myOwner = team.some((member) => member.name === myOwner) ? myOwner : team[0]?.name || "";
+  document.querySelector("#myOwnerSelect").innerHTML = ownerOptions(myOwner, false);
   const workflowSelect = document.querySelector("#workflowOwnerSelect");
   workflowOwner = team.some((member) => member.name === workflowOwner) ? workflowOwner : team[0]?.name || "";
   workflowSelect.innerHTML = ownerOptions(workflowOwner, false);
@@ -464,16 +530,22 @@ function renderOwnerControls() {
 }
 
 function leadRank(lead) {
+  if (lead.status === "converted") return 6;
+  if (lead.status === "consultation") return 5;
   if (lead.status === "appointment") return 4;
-  if (lead.status === "contacted") return 2;
+  if (lead.status === "contacted") return 3;
+  if (lead.status === "attempted") return 2;
   if (lead.urgency === "Hot") return 0;
   if (lead.urgency === "Warm") return 1;
-  return 3;
+  return 7;
 }
 
 function pipelineGroupKey(lead) {
+  if (lead.status === "converted") return "converted";
+  if (lead.status === "consultation") return "consultation";
   if (lead.status === "appointment") return "appointment";
   if (lead.status === "contacted") return "contacted";
+  if (lead.status === "attempted") return "attempted";
   if (lead.urgency === "Hot") return "hot";
   if (lead.urgency === "Warm") return "warm";
   return "nurture";
@@ -481,7 +553,7 @@ function pipelineGroupKey(lead) {
 
 function ownerLeads(owner) {
   return leads
-    .filter((lead) => lead.assignedTo === owner && lead.status !== "closed")
+    .filter((lead) => lead.assignedTo === owner && !["closed", "lost", "doNotContact"].includes(lead.status))
     .sort((a, b) => leadRank(a) - leadRank(b) || sortNewest(a, b));
 }
 
@@ -509,7 +581,9 @@ function workflowLeadCard(lead) {
       </div>
       <div class="lead-actions">
         <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
-        <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="contacted">Contacted</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="contacted">Contacted</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="appointment">Appointment</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
       </div>
@@ -536,6 +610,93 @@ function renderWorkflow() {
       </section>
     `;
   }).join("");
+}
+
+function renderLeadBucket(listId, countId, items, emptyText) {
+  document.querySelector(`#${countId}`).textContent = items.length;
+  document.querySelector(`#${listId}`).innerHTML = items.length ? items.map(workflowLeadCard).join("") : emptyState(emptyText);
+}
+
+function renderMyLeads() {
+  const mine = ownerLeads(myOwner);
+  const today = dateKey();
+  const due = mine.filter((lead) => !lead.nextFollowUpDate || lead.nextFollowUpDate <= today);
+  const newUnworked = mine.filter((lead) => ["new", "claimed"].includes(lead.status) && !lead.firstAttemptedAt && !lead.firstContactedAt);
+  const hot = mine.filter((lead) => lead.urgency === "Hot" && !["converted", "lost", "closed"].includes(lead.status));
+  const contacted = mine.filter((lead) => ["attempted", "contacted"].includes(lead.status));
+  const nurture = mine.filter((lead) => lead.status === "nurture" || lead.urgency === "Nurture");
+
+  renderLeadBucket("myDueLeads", "myDueCount", due, "Nothing due today.");
+  renderLeadBucket("myNewLeads", "myNewCount", newUnworked, "No untouched leads.");
+  renderLeadBucket("myHotLeads", "myHotCount", hot, "No hot leads.");
+  renderLeadBucket("myContactedLeads", "myContactedCount", contacted, "No contacted leads waiting for next step.");
+  renderLeadBucket("myNurtureLeads", "myNurtureCount", nurture, "No nurture leads.");
+}
+
+function countBy(items, getKey) {
+  return items.reduce((totals, item) => {
+    const key = getKey(item) || "Unassigned";
+    totals[key] = (totals[key] || 0) + 1;
+    return totals;
+  }, {});
+}
+
+function weeklyCheckInLeads() {
+  const today = dateKey();
+  const end = weekEndKey();
+  return visibleLeads()
+    .filter((lead) => !["closed", "converted", "lost", "doNotContact"].includes(lead.status))
+    .filter((lead) => !lead.nextFollowUpDate || lead.nextFollowUpDate <= end)
+    .sort((a, b) => (a.nextFollowUpDate || "0000-00-00").localeCompare(b.nextFollowUpDate || "0000-00-00") || leadRank(a) - leadRank(b))
+    .map((lead) => ({
+      ...lead,
+      checkInStatus: !lead.nextFollowUpDate ? "Needs follow-up date" : lead.nextFollowUpDate < today ? "Overdue" : "Due this week",
+    }));
+}
+
+function statRows(title, totals) {
+  const entries = Object.entries(totals).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  return `
+    <article class="report-card">
+      <h3>${title}</h3>
+      ${entries.length ? entries.map(([label, value]) => `
+        <div class="stat-row">
+          <span>${escapeHtml(label)}</span>
+          <strong>${value}</strong>
+        </div>
+      `).join("") : `<div class="empty-state">No data</div>`}
+    </article>
+  `;
+}
+
+function renderReports() {
+  const scope = visibleLeads();
+  const active = scope.filter((lead) => !["closed", "converted", "lost", "doNotContact"].includes(lead.status));
+  const weekly = weeklyCheckInLeads();
+  const overdue = weekly.filter((lead) => lead.checkInStatus === "Overdue").length;
+  const noDate = weekly.filter((lead) => lead.checkInStatus === "Needs follow-up date").length;
+  document.querySelector("#reportMetrics").innerHTML = [
+    metricCard("Weekly check-ins", weekly.length, "Due or missing next step"),
+    metricCard("Overdue", overdue, "Past follow-up date"),
+    metricCard("No follow-up date", noDate, "Needs next step"),
+    metricCard("Active funnel", active.length, "Open leads"),
+    metricCard("Converted", scope.filter((lead) => lead.status === "converted").length, "Became clients"),
+  ].join("");
+  document.querySelector("#weeklyCheckInReport").innerHTML = weekly.length ? weekly.map((lead) => `
+    <div class="table-row report-row">
+      <strong>${escapeHtml(lead.name)}</strong>
+      <span>${escapeHtml(lead.assignedTo || "Unassigned")}</span>
+      <span>${escapeHtml(lead.source)} · ${escapeHtml(lead.urgency)}</span>
+      <span>${lead.nextFollowUpDate ? dateOnlyLabel(lead.nextFollowUpDate) : "No date"} · ${lead.checkInStatus}</span>
+      <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
+    </div>
+  `).join("") : emptyState("No weekly check-ins needed.");
+  document.querySelector("#overallStatsReport").innerHTML = [
+    statRows("By status", countBy(scope, (lead) => statusLabel(lead.status))),
+    statRows("By source", countBy(scope, (lead) => lead.source)),
+    statRows("By owner", countBy(scope, (lead) => lead.assignedTo || "Unassigned")),
+    statRows("By urgency", countBy(scope, (lead) => lead.urgency)),
+  ].join("");
 }
 
 function renderSettings() {
@@ -566,9 +727,12 @@ function renderAll() {
   renderInbox();
   renderTeam();
   renderOwnerControls();
+  renderMyLeads();
   renderWorkflow();
+  renderReports();
   renderSettings();
   renderSyncStatus();
+  applyAccountAccess();
 }
 
 function switchView(view) {
@@ -592,6 +756,13 @@ function fillLeadForm(lead = {}) {
   form.elements.status.value = lead.status || "new";
   form.elements.assignedTo.value = lead.assignedTo || "";
   form.elements.nextFollowUpDate.value = lead.nextFollowUpDate || "";
+  form.elements.firstAttemptedAt.value = lead.firstAttemptedAt || "";
+  form.elements.firstContactedAt.value = lead.firstContactedAt || "";
+  form.elements.appointmentSetAt.value = lead.appointmentSetAt || "";
+  form.elements.consultationCompletedAt.value = lead.consultationCompletedAt || "";
+  form.elements.convertedAt.value = lead.convertedAt || "";
+  form.elements.lostAt.value = lead.lostAt || "";
+  form.elements.outcomeNotes.value = lead.outcomeNotes || "";
   form.elements.message.value = lead.message || "";
 }
 
@@ -618,6 +789,13 @@ function saveLead(form) {
     status: String(data.get("status") || existing?.status || "new"),
     assignedTo: String(data.get("assignedTo") || "").trim(),
     nextFollowUpDate: data.get("nextFollowUpDate") || "",
+    firstAttemptedAt: data.get("firstAttemptedAt") || "",
+    firstContactedAt: data.get("firstContactedAt") || "",
+    appointmentSetAt: data.get("appointmentSetAt") || "",
+    consultationCompletedAt: data.get("consultationCompletedAt") || "",
+    convertedAt: data.get("convertedAt") || "",
+    lostAt: data.get("lostAt") || "",
+    outcomeNotes: String(data.get("outcomeNotes") || "").trim(),
     message: String(data.get("message") || "").trim(),
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -659,10 +837,35 @@ function updateLeadStatus(leadId, status) {
   const lead = leads.find((entry) => entry.id === Number(leadId));
   if (!lead) return;
   lead.status = status;
+  const today = dateKey();
+  if (status === "contacted" && !lead.firstContactedAt) lead.firstContactedAt = today;
+  if (status === "appointment" && !lead.appointmentSetAt) lead.appointmentSetAt = today;
   addActivity(lead, `Status changed to ${statusLabel(status)}.`);
   saveAndSync();
   renderAll();
   showToast("Lead status updated.");
+}
+
+function updateResponseMilestone(leadId, response) {
+  const lead = leads.find((entry) => entry.id === Number(leadId));
+  if (!lead) return;
+  const today = dateKey();
+  const updates = {
+    attempted: ["firstAttemptedAt", "attempted", "First contact attempt logged."],
+    contacted: ["firstContactedAt", "contacted", "First contact made."],
+    appointment: ["appointmentSetAt", "appointment", "Appointment set."],
+    consultation: ["consultationCompletedAt", "consultation", "Consultation completed."],
+    converted: ["convertedAt", "converted", "Lead converted to client."],
+    lost: ["lostAt", "lost", "Lead marked lost."],
+  };
+  const update = updates[response];
+  if (!update) return;
+  lead[update[0]] = lead[update[0]] || today;
+  lead.status = update[1];
+  addActivity(lead, update[2]);
+  saveAndSync();
+  renderAll();
+  showToast(update[2]);
 }
 
 function fillTeamForm(member = {}) {
@@ -826,10 +1029,16 @@ function matchTeamMember(value) {
 
 function normalizeLeadStatus(value) {
   const normalized = String(value || "").toLowerCase();
+  const compact = normalized.replace(/[^a-z0-9]+/g, "");
+  if (normalized.includes("do not contact") || compact.includes("donotcontact") || normalized.includes("dnc")) return "doNotContact";
+  if (normalized.includes("converted") || normalized.includes("client")) return "converted";
+  if (normalized.includes("consult")) return "consultation";
   if (normalized.includes("appointment")) return "appointment";
   if (normalized.includes("contact")) return "contacted";
+  if (normalized.includes("attempt")) return "attempted";
   if (normalized.includes("nurture") || normalized.includes("cold")) return "nurture";
-  if (normalized.includes("closed") || normalized.includes("dead")) return "closed";
+  if (normalized.includes("lost") || normalized.includes("dead")) return "lost";
+  if (normalized.includes("closed")) return "closed";
   if (normalized.includes("claim") || normalized.includes("assign")) return "claimed";
   return "new";
 }
@@ -870,6 +1079,13 @@ function leadFromCsvRow(row, headerMap) {
     status: normalizeLeadStatus(status),
     assignedTo: matchTeamMember(owner),
     nextFollowUpDate: normalizeCsvDate(rowValue(row, headerMap, ["next follow up", "next follow-up", "follow up date", "follow-up date", "next task date"])),
+    firstAttemptedAt: normalizeCsvDate(rowValue(row, headerMap, ["first attempted", "contact attempted", "first contact attempted"])),
+    firstContactedAt: normalizeCsvDate(rowValue(row, headerMap, ["first contacted", "contact made", "first contact made"])),
+    appointmentSetAt: normalizeCsvDate(rowValue(row, headerMap, ["appointment set", "appointment date"])),
+    consultationCompletedAt: normalizeCsvDate(rowValue(row, headerMap, ["consultation completed", "consult date", "buyer consult", "seller consult"])),
+    convertedAt: normalizeCsvDate(rowValue(row, headerMap, ["converted", "converted date", "client date"])),
+    lostAt: normalizeCsvDate(rowValue(row, headerMap, ["lost date", "closed lost"])),
+    outcomeNotes: rowValue(row, headerMap, ["lost reason", "outcome", "outcome notes"]),
     message: rowValue(row, headerMap, ["message", "notes", "comments", "inquiry"]),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -915,7 +1131,7 @@ function downloadOwnerLeads(owner) {
   const ownerName = owner || workflowOwner || team[0]?.name || "";
   const rows = leads.filter((lead) => lead.assignedTo === ownerName);
   downloadCsv(`${ownerName || "unassigned"}-leads.csv`, [
-    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Next Follow-Up", "Message"],
+    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Next Follow-Up", "First Attempted", "First Contacted", "Appointment Set", "Consultation Completed", "Converted", "Lost", "Outcome Notes", "Message"],
     ...rows.map((lead) => [
       lead.name,
       lead.phone,
@@ -927,6 +1143,32 @@ function downloadOwnerLeads(owner) {
       lead.urgency,
       statusLabel(lead.status),
       lead.nextFollowUpDate,
+      lead.firstAttemptedAt,
+      lead.firstContactedAt,
+      lead.appointmentSetAt,
+      lead.consultationCompletedAt,
+      lead.convertedAt,
+      lead.lostAt,
+      lead.outcomeNotes,
+      lead.message,
+    ]),
+  ]);
+}
+
+function downloadWeeklyReport() {
+  const rows = weeklyCheckInLeads();
+  downloadCsv("weekly-lead-check-ins.csv", [
+    ["Name", "Owner", "Phone", "Email", "Source", "Urgency", "Status", "Next Follow-Up", "Check-In Status", "Message"],
+    ...rows.map((lead) => [
+      lead.name,
+      lead.assignedTo,
+      lead.phone,
+      lead.email,
+      lead.source,
+      lead.urgency,
+      statusLabel(lead.status),
+      lead.nextFollowUpDate,
+      lead.checkInStatus,
       lead.message,
     ]),
   ]);
@@ -965,6 +1207,9 @@ document.addEventListener("click", (event) => {
 
   const status = event.target.closest("[data-status-lead]");
   if (status) updateLeadStatus(status.dataset.statusLead, status.dataset.status);
+
+  const response = event.target.closest("[data-response-lead]");
+  if (response) updateResponseMilestone(response.dataset.responseLead, response.dataset.response);
 
   const toggleTeam = event.target.closest("[data-toggle-team]");
   if (toggleTeam) toggleTeamMember(toggleTeam.dataset.toggleTeam);
@@ -1007,10 +1252,22 @@ document.querySelector("#ownerFilter").addEventListener("change", (event) => {
   ownerFilter = event.target.value;
   renderInbox();
 });
+document.querySelector("#myOwnerSelect").addEventListener("change", (event) => {
+  myOwner = event.target.value;
+  localStorage.setItem(MY_OWNER_KEY, myOwner);
+  renderAll();
+});
+document.querySelector("#accountRoleSelect").addEventListener("change", (event) => {
+  accountRole = event.target.value;
+  localStorage.setItem(ACCOUNT_ROLE_KEY, accountRole);
+  renderAll();
+});
 document.querySelector("#workflowOwnerSelect").addEventListener("change", (event) => {
   workflowOwner = event.target.value;
   renderWorkflow();
 });
+document.querySelector("#downloadMyLeads").addEventListener("click", () => downloadOwnerLeads(myOwner));
+document.querySelector("#downloadReportButton").addEventListener("click", downloadWeeklyReport);
 document.querySelector("#downloadWorkflowOwner").addEventListener("click", () => downloadOwnerLeads(workflowOwner));
 document.querySelector("#downloadOwnerButton").addEventListener("click", () => downloadOwnerLeads(document.querySelector("#downloadOwnerSelect").value));
 document.querySelector("#exportButton").addEventListener("click", exportData);

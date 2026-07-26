@@ -14,6 +14,11 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Assigns imported leads to matching team members when the CSV has an owner/agent field.
 - Downloads lead CSV files by owner/team member.
 - Shows an owner workflow with daily contacts and a hot-to-cold pipeline.
+- Adds a My Leads view for the selected team member.
+- Tracks response milestones: first attempt, first contact, appointment, consultation, converted, and lost.
+- Adds Reports with weekly check-ins and overall stats.
+- Adds account type mode: Master account or Team member account.
+- Adds Do not contact status and renames closed to Closed sale.
 - Saves data in this browser.
 - Supports export/import backup.
 - Includes installable-app starter files for later hosting.

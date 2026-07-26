@@ -160,7 +160,7 @@ button {
 
 .sync-panel {
   display: grid;
-  grid-template-columns: minmax(180px, 0.75fr) minmax(320px, 1fr) auto;
+  grid-template-columns: minmax(180px, 0.75fr) minmax(140px, 0.45fr) minmax(150px, 0.45fr) minmax(260px, 1fr) auto;
   gap: 10px;
   align-items: center;
   margin-bottom: 16px;
@@ -189,6 +189,10 @@ button {
 
 .auth-form input {
   min-width: 0;
+}
+
+.work-as-control {
+  min-width: 150px;
 }
 
 .hidden {
@@ -262,7 +266,7 @@ p {
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -422,9 +426,65 @@ p {
   gap: 14px;
 }
 
+.my-leads-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .owner-pipeline {
   display: grid;
   gap: 10px;
+}
+
+.report-metrics {
+  margin-bottom: 12px;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.report-table {
+  display: grid;
+  gap: 7px;
+}
+
+.report-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface);
+}
+
+.report-card h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.stat-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.stat-row strong {
+  color: var(--ink);
 }
 
 .pipeline-column-card {
@@ -460,6 +520,10 @@ p {
 .table-row {
   grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.7fr) minmax(160px, 1fr) minmax(120px, 0.6fr) auto;
   align-items: center;
+}
+
+.report-row {
+  grid-template-columns: minmax(150px, 1fr) minmax(110px, 0.65fr) minmax(140px, 0.85fr) minmax(170px, 1fr) auto;
 }
 
 .table-row strong,
@@ -621,7 +685,7 @@ label {
   }
 
   .nav-list {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .nav-item {
@@ -636,6 +700,8 @@ label {
   .metrics-grid,
   .desk-layout,
   .workflow-grid,
+  .my-leads-grid,
+  .report-grid,
   .team-grid {
     grid-template-columns: 1fr;
   }
