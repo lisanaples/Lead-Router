@@ -144,6 +144,20 @@ button {
   margin-bottom: 22px;
 }
 
+.topbar-actions {
+  flex-wrap: wrap;
+}
+
+.topbar-actions,
+.filter-row {
+  min-width: 0;
+}
+
+.filter-row select,
+.filter-row input {
+  min-width: 160px;
+}
+
 .sync-panel {
   display: grid;
   grid-template-columns: minmax(180px, 0.75fr) minmax(320px, 1fr) auto;
@@ -383,6 +397,48 @@ p {
   padding: 8px;
 }
 
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.section-title h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+
+.section-title span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.workflow-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr);
+  gap: 14px;
+}
+
+.owner-pipeline {
+  display: grid;
+  gap: 10px;
+}
+
+.pipeline-column-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: rgba(245, 248, 248, 0.7);
+}
+
+.pipeline-column-card .empty-state {
+  min-height: 54px;
+  font-size: 0.78rem;
+}
+
 .activity-log,
 .team-grid,
 .lead-table {
@@ -565,7 +621,7 @@ label {
   }
 
   .nav-list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .nav-item {
@@ -579,6 +635,7 @@ label {
 
   .metrics-grid,
   .desk-layout,
+  .workflow-grid,
   .team-grid {
     grid-template-columns: 1fr;
   }

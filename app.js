@@ -5,6 +5,15 @@ const CLOUD_SESSION_KEY = "lead-router-cloud-session-v1";
 const SUPABASE_URL = "https://agmmravjjeaqdpbvbyqn.supabase.co";
 const SUPABASE_KEY = "sb_publishable_AuIT60GWzMHHhtr7MKIH-Q_AFVs8PnE";
 const CLOUD_RECORD_ID = "lead-router-shared-workspace";
+const TEAM_STATUSES = ["Available", "On call", "Backup only", "Paused", "Out of office", "Admin only"];
+const ROUTING_STATUSES = ["Available", "On call"];
+const PIPELINE_GROUPS = [
+  { key: "hot", label: "Hot" },
+  { key: "warm", label: "Warm" },
+  { key: "contacted", label: "Contacted" },
+  { key: "nurture", label: "Nurture / Cold" },
+  { key: "appointment", label: "Appointment set" },
+];
 
 const sampleLeads = [
   {
@@ -47,9 +56,9 @@ const sampleLeads = [
 ];
 
 const sampleTeam = [
-  { id: 1, name: "Lisa", phone: "717-555-0101", email: "lisa@example.com", active: true, claims: 1 },
-  { id: 2, name: "Assistant", phone: "717-555-0102", email: "assistant@example.com", active: true, claims: 0 },
-  { id: 3, name: "Buyer Agent", phone: "717-555-0103", email: "buyeragent@example.com", active: true, claims: 0 },
+  { id: 1, name: "Lisa", phone: "717-555-0101", email: "lisa@example.com", status: "Available", claims: 1 },
+  { id: 2, name: "Assistant", phone: "717-555-0102", email: "assistant@example.com", status: "Available", claims: 0 },
+  { id: 3, name: "Buyer Agent", phone: "717-555-0103", email: "buyeragent@example.com", status: "On call", claims: 0 },
 ];
 
 const defaultSettings = {
@@ -64,7 +73,19 @@ let settings = loadJson(SETTINGS_KEY, defaultSettings);
 let activeView = "dashboard";
 let searchTerm = "";
 let statusFilter = "all";
+let ownerFilter = "all";
+let workflowOwner = "";
 let cloudSession = loadCloudSession();
+
+team = team.map((member) => ({
+  ...member,
+  status: member.status || (member.active === false ? "Paused" : "Available"),
+}));
+leads = leads.map((lead) => ({
+  ...lead,
+  nextFollowUpDate: lead.nextFollowUpDate || "",
+}));
+workflowOwner = team[0]?.name || "";
 
 function minutesAgo(value) {
   return new Date(Date.now() - value * 60000).toISOString();
@@ -110,7 +131,7 @@ function applySnapshot(snapshot) {
   leads = Array.isArray(snapshot.leads) ? snapshot.leads : leads;
   team = Array.isArray(snapshot.team) ? snapshot.team : team;
   settings = snapshot.settings || settings;
-  saveAndSync();
+  saveAll();
   renderAll();
 }
 
@@ -193,7 +214,7 @@ async function syncCloudSnapshot(options = {}) {
 }
 
 function saveAndSync(options = {}) {
-  saveAndSync();
+  saveAll();
   if (cloudSession?.access_token) syncCloudSnapshot({ silent: options.silent !== false });
 }
 
@@ -213,6 +234,15 @@ function dateTimeLabel(value) {
     hour: "numeric",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function dateOnlyLabel(value) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(new Date(`${value}T12:00:00`));
+}
+
+function dateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
 }
 
 function leadAge(value) {
@@ -235,6 +265,35 @@ function statusLabel(status) {
   return labels[status] || status;
 }
 
+function teamMemberStatus(member) {
+  return member.status || (member.active === false ? "Paused" : "Available");
+}
+
+function teamStatusOptions(selected = "Available") {
+  return TEAM_STATUSES.map((status) => `
+    <option ${status === selected ? "selected" : ""}>${status}</option>
+  `).join("");
+}
+
+function ownerOptions(selected = "", includeUnassigned = true) {
+  return [
+    includeUnassigned ? `<option value="">Unassigned</option>` : "",
+    ...team.map((member) => `
+      <option value="${escapeHtml(member.name)}" ${member.name === selected ? "selected" : ""}>${escapeHtml(member.name)}</option>
+    `),
+  ].join("");
+}
+
+function ownerFilterOptions(selected = "all") {
+  return [
+    `<option value="all" ${selected === "all" ? "selected" : ""}>All owners</option>`,
+    `<option value="" ${selected === "" ? "selected" : ""}>Unassigned</option>`,
+    ...team.map((member) => `
+      <option value="${escapeHtml(member.name)}" ${member.name === selected ? "selected" : ""}>${escapeHtml(member.name)}</option>
+    `),
+  ].join("");
+}
+
 function showToast(message) {
   const toast = document.querySelector("#toast");
   toast.textContent = message;
@@ -243,7 +302,7 @@ function showToast(message) {
 }
 
 function activeTeam() {
-  return team.filter((member) => member.active);
+  return team.filter((member) => ROUTING_STATUSES.includes(teamMemberStatus(member)));
 }
 
 function broadcastLead(lead) {
@@ -266,6 +325,7 @@ function addActivity(lead, text) {
 
 function leadCard(lead, compact = false) {
   const assigned = lead.assignedTo ? `Assigned to ${escapeHtml(lead.assignedTo)}` : "Available to claim";
+  const followUp = lead.nextFollowUpDate ? `Follow-up ${dateOnlyLabel(lead.nextFollowUpDate)}` : "No follow-up set";
   return `
     <article class="lead-card ${lead.urgency.toLowerCase()} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
       <div class="lead-main">
@@ -281,6 +341,7 @@ function leadCard(lead, compact = false) {
         <span>${escapeHtml(lead.urgency)}</span>
         <span>${leadAge(lead.createdAt)}</span>
         <span>${assigned}</span>
+        <span>${followUp}</span>
       </div>
       ${compact ? "" : `<p>${escapeHtml(lead.message || "No message yet.")}</p>`}
       <div class="lead-actions">
@@ -357,10 +418,11 @@ function filteredLeads() {
   const term = searchTerm.trim().toLowerCase();
   return leads.filter((lead) => {
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
+    const matchesOwner = ownerFilter === "all" || String(lead.assignedTo || "") === ownerFilter;
     const haystack = [lead.name, lead.source, lead.type, lead.phone, lead.email, lead.property, lead.price, lead.message, lead.assignedTo]
       .join(" ")
       .toLowerCase();
-    return matchesStatus && haystack.includes(term);
+    return matchesStatus && matchesOwner && haystack.includes(term);
   }).sort(sortNewest);
 }
 
@@ -371,7 +433,7 @@ function renderInbox() {
       <strong>${escapeHtml(lead.name)}</strong>
       <span>${escapeHtml(lead.source)} · ${escapeHtml(lead.type)}</span>
       <span>${escapeHtml(lead.property || "No property")}</span>
-      <span>${statusLabel(lead.status)}</span>
+      <span>${escapeHtml(lead.assignedTo || "Unassigned")} · ${statusLabel(lead.status)}</span>
       <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
     </div>
   `).join("") : emptyState("No leads match this view.");
@@ -379,14 +441,101 @@ function renderInbox() {
 
 function renderTeam() {
   document.querySelector("#teamGrid").innerHTML = team.map((member) => `
-    <article class="team-card ${member.active ? "" : "paused"}">
+    <article class="team-card ${ROUTING_STATUSES.includes(teamMemberStatus(member)) ? "" : "paused"}">
       <strong>${escapeHtml(member.name)}</strong>
       <span>${escapeHtml(member.phone || "No phone")}</span>
       <span>${escapeHtml(member.email || "No email")}</span>
-      <span>${member.active ? "Active for routing" : "Paused"}</span>
-      <button class="ghost-button" type="button" data-toggle-team="${member.id}">${member.active ? "Pause" : "Activate"}</button>
+      <span>${escapeHtml(teamMemberStatus(member))}</span>
+      <div class="lead-actions">
+        <button class="ghost-button" type="button" data-edit-team="${member.id}">Edit</button>
+        <button class="ghost-button" type="button" data-download-owner="${escapeHtml(member.name)}">Download leads</button>
+      </div>
     </article>
   `).join("");
+}
+
+function renderOwnerControls() {
+  document.querySelector("#ownerFilter").innerHTML = ownerFilterOptions(ownerFilter);
+  document.querySelector("#downloadOwnerSelect").innerHTML = ownerOptions(team[0]?.name || "", false);
+  const workflowSelect = document.querySelector("#workflowOwnerSelect");
+  workflowOwner = team.some((member) => member.name === workflowOwner) ? workflowOwner : team[0]?.name || "";
+  workflowSelect.innerHTML = ownerOptions(workflowOwner, false);
+  document.querySelector("#leadOwnerSelect").innerHTML = ownerOptions("", true);
+}
+
+function leadRank(lead) {
+  if (lead.status === "appointment") return 4;
+  if (lead.status === "contacted") return 2;
+  if (lead.urgency === "Hot") return 0;
+  if (lead.urgency === "Warm") return 1;
+  return 3;
+}
+
+function pipelineGroupKey(lead) {
+  if (lead.status === "appointment") return "appointment";
+  if (lead.status === "contacted") return "contacted";
+  if (lead.urgency === "Hot") return "hot";
+  if (lead.urgency === "Warm") return "warm";
+  return "nurture";
+}
+
+function ownerLeads(owner) {
+  return leads
+    .filter((lead) => lead.assignedTo === owner && lead.status !== "closed")
+    .sort((a, b) => leadRank(a) - leadRank(b) || sortNewest(a, b));
+}
+
+function dailyWorkflowLeads(owner) {
+  const today = dateKey();
+  return ownerLeads(owner)
+    .filter((lead) => !lead.nextFollowUpDate || lead.nextFollowUpDate <= today || lead.status === "new")
+    .sort((a, b) => (a.nextFollowUpDate || "0000-00-00").localeCompare(b.nextFollowUpDate || "0000-00-00") || leadRank(a) - leadRank(b));
+}
+
+function workflowLeadCard(lead) {
+  return `
+    <article class="lead-card ${lead.urgency.toLowerCase()} ${lead.status === "new" ? "" : "claimed"}">
+      <div class="lead-main">
+        <div>
+          <strong>${escapeHtml(lead.name)}</strong>
+          <span>${escapeHtml(lead.property || "No property")}</span>
+        </div>
+        <span class="status-pill">${statusLabel(lead.status)}</span>
+      </div>
+      <div class="lead-meta">
+        <span>${escapeHtml(lead.source)}</span>
+        <span>${escapeHtml(lead.urgency)}</span>
+        <span>${lead.nextFollowUpDate ? `Follow-up ${dateOnlyLabel(lead.nextFollowUpDate)}` : "Needs follow-up date"}</span>
+      </div>
+      <div class="lead-actions">
+        <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
+        <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="contacted">Contacted</button>
+        <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
+        <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderWorkflow() {
+  const owner = workflowOwner || team[0]?.name || "";
+  const daily = dailyWorkflowLeads(owner);
+  document.querySelector("#dailyWorkflowCount").textContent = daily.length;
+  document.querySelector("#dailyWorkflowList").innerHTML = daily.length ? daily.map(workflowLeadCard).join("") : emptyState("No contacts due for this owner.");
+  document.querySelector("#ownerPipeline").innerHTML = PIPELINE_GROUPS.map((group) => {
+    const groupLeads = ownerLeads(owner).filter((lead) => pipelineGroupKey(lead) === group.key);
+    return `
+      <section class="pipeline-column-card">
+        <div class="section-title">
+          <h3>${group.label}</h3>
+          <span>${groupLeads.length}</span>
+        </div>
+        <div class="lead-list compact">
+          ${groupLeads.length ? groupLeads.map((lead) => leadCard(lead, true)).join("") : emptyState("None")}
+        </div>
+      </section>
+    `;
+  }).join("");
 }
 
 function renderSettings() {
@@ -416,6 +565,8 @@ function renderAll() {
   renderDashboard();
   renderInbox();
   renderTeam();
+  renderOwnerControls();
+  renderWorkflow();
   renderSettings();
   renderSyncStatus();
 }
@@ -428,6 +579,7 @@ function switchView(view) {
 
 function fillLeadForm(lead = {}) {
   const form = document.querySelector("#leadForm");
+  form.elements.assignedTo.innerHTML = ownerOptions(lead.assignedTo || "", true);
   form.elements.leadId.value = lead.id || "";
   form.elements.source.value = lead.source || "";
   form.elements.type.value = lead.type || "Buyer";
@@ -437,6 +589,9 @@ function fillLeadForm(lead = {}) {
   form.elements.property.value = lead.property || "";
   form.elements.price.value = lead.price || "";
   form.elements.urgency.value = lead.urgency || "Warm";
+  form.elements.status.value = lead.status || "new";
+  form.elements.assignedTo.value = lead.assignedTo || "";
+  form.elements.nextFollowUpDate.value = lead.nextFollowUpDate || "";
   form.elements.message.value = lead.message || "";
 }
 
@@ -460,8 +615,9 @@ function saveLead(form) {
     property: String(data.get("property") || "").trim(),
     price: String(data.get("price") || "").trim(),
     urgency: String(data.get("urgency") || "Warm"),
-    status: existing?.status || "new",
-    assignedTo: existing?.assignedTo || "",
+    status: String(data.get("status") || existing?.status || "new"),
+    assignedTo: String(data.get("assignedTo") || "").trim(),
+    nextFollowUpDate: data.get("nextFollowUpDate") || "",
     message: String(data.get("message") || "").trim(),
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -509,28 +665,53 @@ function updateLeadStatus(leadId, status) {
   showToast("Lead status updated.");
 }
 
+function fillTeamForm(member = {}) {
+  const form = document.querySelector("#teamForm");
+  form.elements.teamId.value = member.id || "";
+  form.elements.name.value = member.name || "";
+  form.elements.phone.value = member.phone || "";
+  form.elements.email.value = member.email || "";
+  form.elements.status.innerHTML = teamStatusOptions(teamMemberStatus(member));
+}
+
+function openTeamDialog(member) {
+  fillTeamForm(member);
+  document.querySelector("#teamDialog h2").textContent = member ? "Edit Team Member" : "Add Team Member";
+  document.querySelector("#teamDialog").showModal();
+}
+
 function saveTeamMember(form) {
   const data = new FormData(form);
-  team.push({
-    id: Date.now(),
+  const existingId = Number(data.get("teamId"));
+  const existing = team.find((member) => member.id === existingId);
+  const oldName = existing?.name;
+  const member = {
+    id: existing?.id || Date.now(),
     name: String(data.get("name") || "").trim(),
     phone: String(data.get("phone") || "").trim(),
     email: String(data.get("email") || "").trim(),
-    active: data.get("active") === "true",
-    claims: 0,
-  });
-  saveAll();
+    status: String(data.get("status") || "Available"),
+    claims: existing?.claims || 0,
+  };
+  if (existing) Object.assign(existing, member);
+  else team.push(member);
+  if (oldName && oldName !== member.name) {
+    leads.forEach((lead) => {
+      if (lead.assignedTo === oldName) lead.assignedTo = member.name;
+    });
+  }
+  saveAndSync();
   form.reset();
   document.querySelector("#teamDialog").close();
   renderAll();
-  showToast("Team member added.");
+  showToast(existing ? "Team member updated." : "Team member added.");
 }
 
 function toggleTeamMember(id) {
   const member = team.find((entry) => entry.id === Number(id));
   if (!member) return;
-  member.active = !member.active;
-  saveAll();
+  member.status = ROUTING_STATUSES.includes(teamMemberStatus(member)) ? "Paused" : "Available";
+  saveAndSync();
   renderAll();
 }
 
@@ -591,6 +772,177 @@ function importData(file) {
   reader.readAsText(file);
 }
 
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      if (row.some((value) => value.trim())) rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  row.push(cell);
+  if (row.some((value) => value.trim())) rows.push(row);
+  return rows;
+}
+
+function normalizedHeader(value) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function rowValue(row, headerMap, names) {
+  const keys = names.map(normalizedHeader);
+  const match = keys.find((key) => headerMap[key] !== undefined);
+  return match ? String(row[headerMap[match]] || "").trim() : "";
+}
+
+function matchTeamMember(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  const member = team.find((entry) => (
+    entry.name.toLowerCase() === normalized ||
+    String(entry.email || "").toLowerCase() === normalized ||
+    String(entry.phone || "").replace(/\D/g, "") === normalized.replace(/\D/g, "")
+  ));
+  return member?.name || value;
+}
+
+function normalizeLeadStatus(value) {
+  const normalized = String(value || "").toLowerCase();
+  if (normalized.includes("appointment")) return "appointment";
+  if (normalized.includes("contact")) return "contacted";
+  if (normalized.includes("nurture") || normalized.includes("cold")) return "nurture";
+  if (normalized.includes("closed") || normalized.includes("dead")) return "closed";
+  if (normalized.includes("claim") || normalized.includes("assign")) return "claimed";
+  return "new";
+}
+
+function normalizeUrgency(value, status = "") {
+  const normalized = String(value || status || "").toLowerCase();
+  if (normalized.includes("hot") || normalized.includes("urgent") || normalized.includes("new")) return "Hot";
+  if (normalized.includes("cold") || normalized.includes("nurture")) return "Nurture";
+  return "Warm";
+}
+
+function normalizeCsvDate(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (!match) return "";
+  const year = match[3].length === 2 ? `20${match[3]}` : match[3];
+  return `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
+}
+
+function leadFromCsvRow(row, headerMap) {
+  const first = rowValue(row, headerMap, ["first name", "firstname"]);
+  const last = rowValue(row, headerMap, ["last name", "lastname"]);
+  const fullName = rowValue(row, headerMap, ["name", "lead name", "contact name", "client"]);
+  const status = rowValue(row, headerMap, ["status", "lead status", "stage"]);
+  const owner = rowValue(row, headerMap, ["owner", "agent", "assigned to", "assigned agent", "user", "claimed by"]);
+  return {
+    id: Date.now() + Math.floor(Math.random() * 100000),
+    source: rowValue(row, headerMap, ["source", "lead source", "provider"]) || "FiveStreet",
+    type: rowValue(row, headerMap, ["type", "lead type", "buyer seller"]) || "Buyer",
+    name: fullName || [first, last].filter(Boolean).join(" ") || "Imported Lead",
+    phone: rowValue(row, headerMap, ["phone", "phone number", "mobile", "cell"]),
+    email: rowValue(row, headerMap, ["email", "email address"]),
+    property: rowValue(row, headerMap, ["property", "address", "listing", "area", "city"]),
+    price: rowValue(row, headerMap, ["price", "price range", "listing price"]),
+    urgency: normalizeUrgency(rowValue(row, headerMap, ["urgency", "priority", "temperature"]), status),
+    status: normalizeLeadStatus(status),
+    assignedTo: matchTeamMember(owner),
+    nextFollowUpDate: normalizeCsvDate(rowValue(row, headerMap, ["next follow up", "next follow-up", "follow up date", "follow-up date", "next task date"])),
+    message: rowValue(row, headerMap, ["message", "notes", "comments", "inquiry"]),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    activity: [{ at: new Date().toISOString(), text: "Imported from FiveStreet CSV." }],
+  };
+}
+
+function importFiveStreetCsv(file) {
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    const rows = parseCsv(String(reader.result || ""));
+    if (rows.length < 2) {
+      showToast("No leads found in that CSV.");
+      return;
+    }
+    const headers = rows[0].map(normalizedHeader);
+    const headerMap = Object.fromEntries(headers.map((header, index) => [header, index]));
+    const imported = rows.slice(1).map((row) => leadFromCsvRow(row, headerMap));
+    leads = [...imported, ...leads];
+    saveAndSync({ silent: false });
+    renderAll();
+    showToast(`${imported.length} FiveStreet leads imported.`);
+  });
+  reader.readAsText(file);
+}
+
+function csvEscape(value) {
+  const text = String(value || "");
+  return /[",\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+function downloadOwnerLeads(owner) {
+  const ownerName = owner || workflowOwner || team[0]?.name || "";
+  const rows = leads.filter((lead) => lead.assignedTo === ownerName);
+  downloadCsv(`${ownerName || "unassigned"}-leads.csv`, [
+    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Next Follow-Up", "Message"],
+    ...rows.map((lead) => [
+      lead.name,
+      lead.phone,
+      lead.email,
+      lead.source,
+      lead.type,
+      lead.property,
+      lead.price,
+      lead.urgency,
+      statusLabel(lead.status),
+      lead.nextFollowUpDate,
+      lead.message,
+    ]),
+  ]);
+}
+
+function moveFollowUp(leadId, days) {
+  const lead = leads.find((entry) => entry.id === Number(leadId));
+  if (!lead) return;
+  const nextDate = new Date();
+  nextDate.setDate(nextDate.getDate() + Number(days));
+  lead.nextFollowUpDate = dateKey(nextDate);
+  addActivity(lead, `Follow-up moved to ${dateOnlyLabel(lead.nextFollowUpDate)}.`);
+  saveAndSync();
+  renderAll();
+}
+
 function loadSampleEmail() {
   document.querySelector("#leadEmailText").value = `Zillow lead notification
 Name: Jordan Smith
@@ -617,6 +969,15 @@ document.addEventListener("click", (event) => {
   const toggleTeam = event.target.closest("[data-toggle-team]");
   if (toggleTeam) toggleTeamMember(toggleTeam.dataset.toggleTeam);
 
+  const editTeam = event.target.closest("[data-edit-team]");
+  if (editTeam) openTeamDialog(team.find((member) => member.id === Number(editTeam.dataset.editTeam)));
+
+  const ownerDownload = event.target.closest("[data-download-owner]");
+  if (ownerDownload) downloadOwnerLeads(ownerDownload.dataset.downloadOwner);
+
+  const followUpButton = event.target.closest("[data-followup-lead]");
+  if (followUpButton) moveFollowUp(followUpButton.dataset.followupLead, followUpButton.dataset.days);
+
   if (event.target.closest("[data-close-dialog]")) event.target.closest("dialog").close();
 });
 
@@ -626,7 +987,7 @@ document.querySelector("#leadForm").addEventListener("submit", (event) => {
   saveLead(event.currentTarget);
 });
 
-document.querySelector("#addTeamMember").addEventListener("click", () => document.querySelector("#teamDialog").showModal());
+document.querySelector("#addTeamMember").addEventListener("click", () => openTeamDialog());
 document.querySelector("#teamForm").addEventListener("submit", (event) => {
   event.preventDefault();
   saveTeamMember(event.currentTarget);
@@ -642,9 +1003,22 @@ document.querySelector("#leadStatusFilter").addEventListener("change", (event) =
   statusFilter = event.target.value;
   renderInbox();
 });
+document.querySelector("#ownerFilter").addEventListener("change", (event) => {
+  ownerFilter = event.target.value;
+  renderInbox();
+});
+document.querySelector("#workflowOwnerSelect").addEventListener("change", (event) => {
+  workflowOwner = event.target.value;
+  renderWorkflow();
+});
+document.querySelector("#downloadWorkflowOwner").addEventListener("click", () => downloadOwnerLeads(workflowOwner));
+document.querySelector("#downloadOwnerButton").addEventListener("click", () => downloadOwnerLeads(document.querySelector("#downloadOwnerSelect").value));
 document.querySelector("#exportButton").addEventListener("click", exportData);
 document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importData(event.target.files[0]);
+});
+document.querySelector("#csvImportInput").addEventListener("change", (event) => {
+  if (event.target.files[0]) importFiveStreetCsv(event.target.files[0]);
 });
 document.querySelector("#authForm").addEventListener("submit", async (event) => {
   event.preventDefault();

@@ -9,6 +9,11 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Simulates notifying active team members.
 - Lets the first available team member claim a lead.
 - Tracks claimed leads, contacted leads, appointments, nurture leads, and closed-out leads.
+- Supports editable team members with statuses: Available, On call, Backup only, Paused, Out of office, and Admin only.
+- Imports lead CSV files exported from FiveStreet.
+- Assigns imported leads to matching team members when the CSV has an owner/agent field.
+- Downloads lead CSV files by owner/team member.
+- Shows an owner workflow with daily contacts and a hot-to-cold pipeline.
 - Saves data in this browser.
 - Supports export/import backup.
 - Includes installable-app starter files for later hosting.
