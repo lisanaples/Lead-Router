@@ -68,7 +68,7 @@ const sampleTeam = [
 ];
 
 const defaultSettings = {
-  notificationTemplate: "New {source} lead: {name}, {type}, {property}. Reply CLAIM {id} to take it.",
+  notificationTemplate: "New {source} lead: {name}, {type}, {property}. Open Lead Router to claim it.",
   allowReclaim: true,
   notifyAll: true,
 };
@@ -162,6 +162,20 @@ async function supabaseRequest(path, options = {}) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.msg || data?.message || "Supabase request failed.");
+  return data;
+}
+
+async function appApiRequest(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) throw new Error(data?.error || data?.message || "Lead Router request failed.");
   return data;
 }
 
@@ -355,6 +369,54 @@ function showToast(message) {
   window.setTimeout(() => toast.classList.remove("visible"), 2800);
 }
 
+function urlBase64ToUint8Array(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replaceAll("-", "+").replaceAll("_", "/");
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
+}
+
+async function enablePushAlerts() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    showToast("Push alerts are not supported on this browser.");
+    return;
+  }
+  if (location.protocol === "file:") {
+    showToast("Push alerts work from the hosted app, not the local file.");
+    return;
+  }
+  if (!myOwner) {
+    showToast("Choose who you are in Working as first.");
+    return;
+  }
+  try {
+    const config = await appApiRequest("/api/public-config");
+    if (!config.pushEnabled || !config.vapidPublicKey) {
+      showToast("Push is not turned on in Vercel yet.");
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      showToast("Push permission was not approved.");
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) await existing.unsubscribe();
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(config.vapidPublicKey),
+    });
+    await appApiRequest("/api/push-subscription", {
+      method: "POST",
+      body: JSON.stringify({ owner: myOwner, subscription }),
+    });
+    showToast(`Push alerts enabled for ${myOwner}.`);
+  } catch (error) {
+    showToast(`Push setup failed: ${error.message}`);
+  }
+}
+
 function activeTeam() {
   return team.filter((member) => ROUTING_STATUSES.includes(teamMemberStatus(member)));
 }
@@ -368,7 +430,7 @@ function broadcastLead(lead) {
     .replaceAll("{type}", lead.type)
     .replaceAll("{property}", lead.property || "No property")
     .replaceAll("{id}", lead.id);
-  addActivity(lead, `Simulated text sent to ${names}: ${message}`);
+  addActivity(lead, `Simulated email/push alert sent to ${names}: ${message}`);
 }
 
 function addActivity(lead, text) {
@@ -707,6 +769,7 @@ function renderSettings() {
 
 function renderSyncStatus() {
   const signedIn = Boolean(cloudSession?.access_token);
+  const pushAvailable = "serviceWorker" in navigator && "PushManager" in window && location.protocol !== "file:";
   document.querySelector("#syncStatus").textContent = signedIn ? "Connected to Supabase" : "Local mode";
   document.querySelector("#syncHelper").textContent = signedIn
     ? "Cloud sharing is on. Refresh before working, and upload after local imports."
@@ -715,6 +778,7 @@ function renderSyncStatus() {
   document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn);
   document.querySelector("#refreshCloudButton").disabled = !signedIn;
   document.querySelector("#uploadCloudButton").disabled = !signedIn;
+  document.querySelector("#enablePushButton").disabled = !pushAvailable || !myOwner;
 }
 
 function emptyState(text) {
@@ -1195,6 +1259,25 @@ Message: I am pre-approved and would like to tour this home today if possible.
 Price: $425,000`;
 }
 
+async function processClaimLink() {
+  const params = new URLSearchParams(window.location.search);
+  const claimId = params.get("claim");
+  const owner = params.get("owner");
+  if (!claimId || !owner) return;
+  try {
+    await appApiRequest(`/api/claim-lead?claim=${encodeURIComponent(claimId)}&owner=${encodeURIComponent(owner)}`);
+    myOwner = owner;
+    localStorage.setItem(MY_OWNER_KEY, myOwner);
+    await refreshFromCloud({ silent: true });
+    switchView("myLeads");
+    showToast(`Lead claimed for ${owner}.`);
+  } catch (error) {
+    showToast(error.message);
+  } finally {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
 document.addEventListener("click", (event) => {
   const nav = event.target.closest("[data-view]");
   if (nav) switchView(nav.dataset.view);
@@ -1306,6 +1389,7 @@ document.querySelector("#createAccountButton").addEventListener("click", async (
 });
 document.querySelector("#refreshCloudButton").addEventListener("click", () => refreshFromCloud());
 document.querySelector("#uploadCloudButton").addEventListener("click", () => syncCloudSnapshot());
+document.querySelector("#enablePushButton").addEventListener("click", enablePushAlerts);
 document.querySelector("#signOutButton").addEventListener("click", () => {
   saveCloudSession(null);
   showToast("Signed out. This browser is back in local mode.");
@@ -1325,3 +1409,4 @@ document.querySelector("#notifyAll").addEventListener("change", (event) => {
 
 renderAll();
 if (cloudSession?.access_token) refreshFromCloud({ silent: true });
+processClaimLink();

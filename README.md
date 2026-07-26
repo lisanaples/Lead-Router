@@ -6,9 +6,9 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 
 - Tracks incoming buyer, seller, investor, and rental leads.
 - Lets you paste a lead email and create a draft lead from the text.
-- Simulates notifying active team members.
+- Can email active team members and send browser push alerts when Vercel notifications are connected.
 - Lets the first available team member claim a lead.
-- Tracks claimed leads, contacted leads, appointments, nurture leads, and closed-out leads.
+- Tracks claimed leads, contacted leads, appointments, nurture leads, do not contact leads, lost leads, and closed sales.
 - Supports editable team members with statuses: Available, On call, Backup only, Paused, Out of office, and Admin only.
 - Imports lead CSV files exported from FiveStreet.
 - Assigns imported leads to matching team members when the CSV has an owner/agent field.
@@ -19,6 +19,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Adds Reports with weekly check-ins and overall stats.
 - Adds account type mode: Master account or Team member account.
 - Adds Do not contact status and renames closed to Closed sale.
+- Adds Vercel API endpoints for incoming lead webhooks, email alerts, push alerts, and claim links.
 - Saves data in this browser.
 - Supports export/import backup.
 - Includes installable-app starter files for later hosting.
@@ -35,13 +36,15 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 7. Upload the updated files to GitHub and let Vercel redeploy.
 8. Sign in inside the app, then use **Upload local data** once to seed the shared cloud workspace.
 
-## What a real connected version would need
+## Connected lead intake and notifications
 
-- A dedicated Supabase project for shared lead data and accounts.
-- An inbound email parser or forwarding address for Zillow, Realtor.com, Homes.com, website forms, and other lead sources.
-- A texting service such as Twilio for team notifications.
-- A claim link or text reply workflow that locks the lead to the first team member who claims it.
-- Admin controls for reassigning leads, pausing agents, and reporting lead response times.
+- The app includes `/api/inbound-lead` for incoming lead webhooks.
+- The app includes `/api/claim-lead` so team members can claim from an email or push link.
+- The app includes `/api/push-subscription` so phones/computers can receive push alerts.
+- Use an email parser or forwarding service for Zillow, Realtor.com, Homes.com, HomeSale.com, Reminder Media, and similar sources.
+- Use email alerts first, then enable push alerts on each team member's phone/computer.
+
+See `LEAD_INTAKE_SETUP.md` for the Vercel, email, push, and email parser setup.
 
 ## Keep separate from Closing Desk
 
