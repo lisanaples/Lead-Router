@@ -47,23 +47,67 @@ function parseBody(raw, contentType = "") {
   return Object.fromEntries(params.entries());
 }
 
+function isGreetingLine(line) {
+  return /^(hi|hello|dear|good morning|good afternoon|good evening)\b/i.test(String(line || "").trim());
+}
+
+function cleanupLeadName(value) {
+  return String(value || "")
+    .replace(/^(name|lead name|contact name|customer name|client name|contact|from):?/i, "")
+    .replace(/,$/, "")
+    .trim();
+}
+
+function lineValueAfterLabel(lines, labels) {
+  const labelPattern = labels.join("|");
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const inlineMatch = line.match(new RegExp(`^(${labelPattern})\\s*:?\\s*(.+)$`, "i"));
+    if (inlineMatch?.[2]) {
+      const value = cleanupLeadName(inlineMatch[2]);
+      if (value && !isGreetingLine(value)) return value;
+    }
+    if (new RegExp(`^(${labelPattern})\\s*:?$`, "i").test(line)) {
+      const next = lines.slice(index + 1).find((entry) => entry && !isGreetingLine(entry));
+      const value = cleanupLeadName(next);
+      if (value) return value;
+    }
+  }
+  return "";
+}
+
+function extractLeadName(lines) {
+  const labeled = lineValueAfterLabel(lines, ["lead name", "contact name", "customer name", "client name", "name", "contact"]);
+  if (labeled) return labeled;
+  const fromLine = lines.find((line) => /^from:/i.test(line) && !/@/.test(line));
+  const fromName = cleanupLeadName(fromLine);
+  if (fromName && !isGreetingLine(fromName)) return fromName;
+  const candidate = lines.find((line) => (
+    !isGreetingLine(line) &&
+    !/@/.test(line) &&
+    !/\d{3}/.test(line) &&
+    !/^(subject|to|from|sent|date|phone|email|property|address|message|comments|listing|price):/i.test(line) &&
+    /^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+){0,3}$/.test(line)
+  ));
+  return cleanupLeadName(candidate) || "New Lead";
+}
+
 function parseLeadEmail(text = "") {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
   const phone = text.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || "";
   const source = /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
-  const nameLine = lines.find((line) => /name:/i.test(line)) || lines.find((line) => /from:/i.test(line)) || lines[0] || "New Lead";
   const propertyLine = lines.find((line) => /(property|address|home|listing):/i.test(line)) || lines.find((line) => /\d+ .*(st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court)/i.test(line)) || "";
   return {
     source,
     type: /sell|seller|valuation|home value/i.test(text) ? "Seller" : "Buyer",
-    name: nameLine.replace(/^(name|from):/i, "").trim() || "New Lead",
+    name: extractLeadName(lines),
     phone,
     email,
     property: propertyLine.replace(/^(property|address|home|listing):/i, "").trim(),
     price: text.match(/\$[\d,]+(?:\s*-\s*\$?[\d,]+)?/)?.[0] || "",
     urgency: /tour|showing|today|asap|pre-approved|preapproved/i.test(text) ? "Hot" : "Warm",
-    message: text.slice(0, 800),
+    message: text,
   };
 }
 

@@ -160,9 +160,9 @@ button {
 
 .sync-panel {
   display: grid;
-  grid-template-columns: minmax(180px, 0.75fr) minmax(140px, 0.45fr) minmax(150px, 0.45fr) minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.5fr) minmax(150px, 0.5fr) minmax(240px, 1fr);
   gap: 10px;
-  align-items: center;
+  align-items: start;
   margin-bottom: 16px;
   border: 1px solid rgba(216, 225, 229, 0.92);
   border-radius: 10px;
@@ -187,8 +187,27 @@ button {
   gap: 7px;
 }
 
+.auth-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+  width: 100%;
+}
+
+.sync-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  width: 100%;
+}
+
 .auth-form input {
   min-width: 0;
+}
+
+.auth-form button,
+.sync-actions button {
+  min-width: 0;
+  white-space: normal;
 }
 
 .work-as-control {
@@ -573,6 +592,28 @@ p {
 .preview-grid strong {
   overflow-wrap: anywhere;
   font-size: 0.92rem;
+}
+
+.parsed-lead-preview details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: white;
+}
+
+.parsed-lead-preview summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.parsed-lead-preview pre {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 textarea,
