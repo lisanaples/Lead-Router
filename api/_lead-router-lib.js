@@ -206,6 +206,19 @@ async function sendPush(member, lead, workspace) {
   return { sent: sent > 0, count: sent };
 }
 
+async function sendTestPush(owner, workspace) {
+  const member = (workspace.team || []).find((entry) => entry.name === owner);
+  if (!member) return { sent: false, error: "That team member was not found." };
+  const lead = {
+    id: "test",
+    source: "Lead Router",
+    type: "Test",
+    name: "Push notification test",
+    property: "Your device is connected",
+  };
+  return sendPush(member, lead, workspace);
+}
+
 async function notifyActiveTeam(workspace, lead) {
   const results = [];
   for (const member of activeRecipients(workspace)) {
@@ -257,5 +270,6 @@ module.exports = {
   optionalEnv,
   parseBody,
   readBody,
+  sendTestPush,
   saveWorkspace,
 };

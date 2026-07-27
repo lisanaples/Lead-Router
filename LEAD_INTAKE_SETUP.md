@@ -16,6 +16,9 @@ This setup receives leads from Zillow, Reminder Media, Realtor.com, Homes.com, H
 - `/api/push-subscription`
   - Saves a phone/computer push subscription for the selected team member.
 
+- `/api/test-push`
+  - Sends one test notification to the selected team member after they enable push alerts.
+
 - `/api/public-config`
   - Lets the app know whether push/email notifications are configured.
 
@@ -51,6 +54,15 @@ npx web-push generate-vapid-keys
 
 Then paste the public and private keys into Vercel as `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`.
 
+Also add:
+
+```text
+VAPID_SUBJECT
+mailto:your-email@example.com
+```
+
+Redeploy Vercel after adding or changing these keys.
+
 ## Email alerts
 
 The current version is set up for Resend because it has a simple email API and is easy to connect to Vercel.
@@ -74,8 +86,11 @@ Each team member should:
 3. Choose their name in **Working as**.
 4. Click **Enable push alerts**.
 5. Allow notifications when the browser asks.
+6. Click **Send test push**.
 
 Push alerts work from the hosted app, not from the local file version.
+
+On iPhone, push alerts usually require opening the installed Home Screen app, not just a normal Safari tab.
 
 ## Lead source setup
 

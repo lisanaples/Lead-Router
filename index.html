@@ -6,7 +6,7 @@
     <title>Lead Router Prototype</title>
     <meta name="theme-color" content="#123846" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=8" />
+    <link rel="stylesheet" href="styles.css?v=9" />
   </head>
   <body>
     <main class="app-shell">
@@ -78,6 +78,7 @@
             <button class="ghost-button" type="button" id="refreshCloudButton">Refresh cloud data</button>
             <button class="primary-button" type="button" id="uploadCloudButton">Upload local data</button>
             <button class="ghost-button" type="button" id="enablePushButton">Enable push alerts</button>
+            <button class="ghost-button" type="button" id="testPushButton">Send test push</button>
             <button class="ghost-button" type="button" id="signOutButton">Sign out</button>
           </div>
         </section>
@@ -407,7 +408,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=8"></script>
+    <script src="app.js?v=9"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");

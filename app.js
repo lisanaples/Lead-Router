@@ -411,9 +411,29 @@ async function enablePushAlerts() {
       method: "POST",
       body: JSON.stringify({ owner: myOwner, subscription }),
     });
-    showToast(`Push alerts enabled for ${myOwner}.`);
+    showToast(`Push alerts enabled for ${myOwner}. Now send a test push.`);
   } catch (error) {
     showToast(`Push setup failed: ${error.message}`);
+  }
+}
+
+async function sendTestPush() {
+  if (location.protocol === "file:") {
+    showToast("Test push works from the hosted app, not the local file.");
+    return;
+  }
+  if (!myOwner) {
+    showToast("Choose who you are in Working as first.");
+    return;
+  }
+  try {
+    await appApiRequest("/api/test-push", {
+      method: "POST",
+      body: JSON.stringify({ owner: myOwner }),
+    });
+    showToast(`Test push sent to ${myOwner}.`);
+  } catch (error) {
+    showToast(`Test push failed: ${error.message}`);
   }
 }
 
@@ -779,6 +799,7 @@ function renderSyncStatus() {
   document.querySelector("#refreshCloudButton").disabled = !signedIn;
   document.querySelector("#uploadCloudButton").disabled = !signedIn;
   document.querySelector("#enablePushButton").disabled = !pushAvailable || !myOwner;
+  document.querySelector("#testPushButton").disabled = !pushAvailable || !myOwner;
 }
 
 function emptyState(text) {
@@ -1390,6 +1411,7 @@ document.querySelector("#createAccountButton").addEventListener("click", async (
 document.querySelector("#refreshCloudButton").addEventListener("click", () => refreshFromCloud());
 document.querySelector("#uploadCloudButton").addEventListener("click", () => syncCloudSnapshot());
 document.querySelector("#enablePushButton").addEventListener("click", enablePushAlerts);
+document.querySelector("#testPushButton").addEventListener("click", sendTestPush);
 document.querySelector("#signOutButton").addEventListener("click", () => {
   saveCloudSession(null);
   showToast("Signed out. This browser is back in local mode.");
