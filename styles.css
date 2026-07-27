@@ -245,7 +245,8 @@ p {
 
 .primary-button,
 .ghost-button,
-.import-button {
+.import-button,
+.danger-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -268,6 +269,12 @@ p {
   border: 1px solid var(--line);
   background: white;
   color: var(--ink);
+}
+
+.danger-button {
+  border: 1px solid rgba(185, 77, 71, 0.28);
+  background: #fff7f6;
+  color: var(--rose);
 }
 
 .import-button input {
@@ -685,6 +692,12 @@ dialog::backdrop {
   display: grid;
   gap: 14px;
   padding: 20px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .close-button {

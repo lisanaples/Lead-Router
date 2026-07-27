@@ -503,6 +503,7 @@ function leadCard(lead, compact = false) {
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="converted">Converted</button>
         <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="nurture">Nurture</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="lost">Lost</button>
+        <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
       </div>
     </article>
   `;
@@ -592,7 +593,10 @@ function renderInbox() {
       <span>${escapeHtml(lead.source)} · ${escapeHtml(lead.type)}</span>
       <span>${escapeHtml(lead.property || "No property")}</span>
       <span>${escapeHtml(lead.assignedTo || "Unassigned")} · ${statusLabel(lead.status)}</span>
-      <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
+      <div class="lead-actions">
+        <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
+        <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
+      </div>
     </div>
   `).join("") : emptyState("No leads match this view.");
 }
@@ -680,6 +684,7 @@ function workflowLeadCard(lead) {
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="appointment">Appointment</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
+        <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
       </div>
     </article>
   `;
@@ -866,6 +871,8 @@ function fillLeadForm(lead = {}) {
 function openLeadDialog(lead) {
   fillLeadForm(lead);
   document.querySelector("#leadDialogTitle").textContent = lead ? "Edit Lead" : "Add Lead";
+  document.querySelector("#deleteLeadButton").classList.toggle("hidden", !lead);
+  document.querySelector("#deleteLeadButton").dataset.deleteLead = lead?.id || "";
   document.querySelector("#leadDialog").showModal();
 }
 
@@ -911,6 +918,19 @@ function saveLead(form) {
   document.querySelector("#leadDialog").close();
   renderAll();
   showToast(existing ? "Lead updated." : "Lead added and simulated notification sent.");
+}
+
+function deleteLead(leadId) {
+  const id = Number(leadId);
+  const lead = leads.find((entry) => entry.id === id);
+  if (!lead) return;
+  const confirmed = window.confirm(`Delete ${lead.name || "this lead"}? This removes it from the shared workspace.`);
+  if (!confirmed) return;
+  leads = leads.filter((entry) => entry.id !== id);
+  saveAndSync({ silent: false });
+  document.querySelector("#leadDialog")?.close();
+  renderAll();
+  showToast("Lead deleted.");
 }
 
 function claimLead(leadId, memberId) {
@@ -1413,6 +1433,9 @@ document.addEventListener("click", (event) => {
 
   const editLead = event.target.closest("[data-edit-lead]");
   if (editLead) openLeadDialog(leads.find((lead) => lead.id === Number(editLead.dataset.editLead)));
+
+  const deleteButton = event.target.closest("[data-delete-lead]");
+  if (deleteButton) deleteLead(deleteButton.dataset.deleteLead);
 
   const claim = event.target.closest("[data-claim-lead]");
   if (claim) claimLead(claim.dataset.claimLead, claim.dataset.member);

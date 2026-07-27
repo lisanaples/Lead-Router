@@ -6,7 +6,7 @@
     <title>Lead Router Prototype</title>
     <meta name="theme-color" content="#123846" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=11" />
+    <link rel="stylesheet" href="styles.css?v=12" />
   </head>
   <body>
     <main class="app-shell">
@@ -378,7 +378,10 @@
           <label>Lost reason / conversion notes <input name="outcomeNotes" placeholder="Not ready, bought with another agent, converted, etc." /></label>
         </section>
         <label>Message <textarea name="message" placeholder="Original message or notes..."></textarea></label>
-        <button class="primary-button" type="submit">Save lead</button>
+        <div class="dialog-actions">
+          <button class="danger-button hidden" type="button" id="deleteLeadButton">Delete lead</button>
+          <button class="primary-button" type="submit">Save lead</button>
+        </div>
       </form>
     </dialog>
 
@@ -410,7 +413,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=11"></script>
+    <script src="app.js?v=12"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");
