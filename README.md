@@ -6,6 +6,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 
 - Tracks incoming buyer, seller, investor, and rental leads.
 - Lets you paste a lead email and create a draft lead from the text.
+- Adds a quick intake flow to preview a pasted lead email, create the lead, and notify active team members.
 - Can email active team members and send browser push alerts when Vercel notifications are connected.
 - Lets the first available team member claim a lead.
 - Tracks claimed leads, contacted leads, appointments, nurture leads, do not contact leads, lost leads, and closed sales.

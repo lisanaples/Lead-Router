@@ -14,7 +14,7 @@ function optionalEnv(name) {
 function setCors(response) {
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  response.setHeader("Access-Control-Allow-Headers", "Content-Type, x-lead-router-secret");
+  response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, x-lead-router-secret");
 }
 
 function handleOptions(request, response) {
@@ -115,6 +115,22 @@ async function supabaseRequest(path, options = {}) {
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.message || data?.msg || text || "Supabase request failed");
+  return data;
+}
+
+async function verifyUserToken(token) {
+  if (!token) throw new Error("Sign in before creating a notified lead.");
+  const url = requiredEnv("SUPABASE_URL");
+  const serviceKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const response = await fetch(`${url}/auth/v1/user`, {
+    headers: {
+      apikey: serviceKey,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!response.ok) throw new Error(data?.message || "Sign in again before creating a notified lead.");
   return data;
 }
 
@@ -272,4 +288,5 @@ module.exports = {
   readBody,
   sendTestPush,
   saveWorkspace,
+  verifyUserToken,
 };

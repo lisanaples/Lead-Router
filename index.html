@@ -6,7 +6,7 @@
     <title>Lead Router Prototype</title>
     <meta name="theme-color" content="#123846" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=9" />
+    <link rel="stylesheet" href="styles.css?v=10" />
   </head>
   <body>
     <main class="app-shell">
@@ -173,15 +173,17 @@
         <section class="view" id="inboxView">
           <section class="panel intake-panel">
             <div>
-              <span class="eyebrow">Email parser</span>
+              <span class="eyebrow">Quick intake</span>
               <h2>Paste a lead email</h2>
-              <p>Paste a Zillow, Realtor.com, Homes.com, or website lead email. The prototype will pull out likely contact details.</p>
+              <p>Paste the full email, review what the app found, then create and notify the team.</p>
             </div>
             <textarea id="leadEmailText" placeholder="Paste lead email text here..."></textarea>
             <div class="button-row">
-              <button class="primary-button" type="button" id="parseEmailButton">Create lead from email</button>
+              <button class="primary-button" type="button" id="parseEmailButton">Preview lead</button>
+              <button class="primary-button hidden" type="button" id="createParsedLeadButton">Create and notify</button>
               <button class="ghost-button" type="button" id="loadSampleButton">Load sample</button>
             </div>
+            <div class="parsed-lead-preview hidden" id="parsedLeadPreview"></div>
           </section>
 
           <section class="panel">
@@ -408,7 +410,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=9"></script>
+    <script src="app.js?v=10"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");

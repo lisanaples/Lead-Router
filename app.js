@@ -84,6 +84,7 @@ let workflowOwner = "";
 let myOwner = localStorage.getItem(MY_OWNER_KEY) || "";
 let accountRole = localStorage.getItem(ACCOUNT_ROLE_KEY) || "master";
 let cloudSession = loadCloudSession();
+let parsedLeadDraft = null;
 
 team = team.map((member) => ({
   ...member,
@@ -177,6 +178,17 @@ async function appApiRequest(path, options = {}) {
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.error || data?.message || "Lead Router request failed.");
   return data;
+}
+
+async function authenticatedAppApiRequest(path, options = {}) {
+  if (!cloudSession?.access_token) throw new Error("Sign in before creating and notifying.");
+  return appApiRequest(path, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${cloudSession.access_token}`,
+      ...(options.headers || {}),
+    },
+  });
 }
 
 async function signIn(email, password) {
@@ -1007,20 +1019,42 @@ function parseLeadEmail(text) {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
   const phone = text.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || "";
-  const source = /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : "Website";
-  const nameLine = lines.find((line) => /name:/i.test(line)) || lines.find((line) => /from:/i.test(line)) || lines[0] || "New Lead";
-  const propertyLine = lines.find((line) => /(property|address|home|listing):/i.test(line)) || lines.find((line) => /\d+ .*(st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court)/i.test(line)) || "";
+  const source = /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
+  const nameLine = lines.find((line) => /^(name|lead name|contact|from):/i.test(line)) || lines.find((line) => /from:/i.test(line)) || lines[0] || "New Lead";
+  const propertyLine = lines.find((line) => /(property|address|home|listing|interested in):/i.test(line)) || lines.find((line) => /\d+ .*(st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pike|blvd|boulevard)/i.test(line)) || "";
+  const messageLine = lines.find((line) => /^(message|comments|note|inquiry):/i.test(line));
   return {
     source,
     type: /sell|seller|valuation|home value/i.test(text) ? "Seller" : "Buyer",
-    name: nameLine.replace(/^(name|from):/i, "").trim() || "New Lead",
+    name: nameLine.replace(/^(name|lead name|contact|from):/i, "").trim() || "New Lead",
     phone,
     email,
-    property: propertyLine.replace(/^(property|address|home|listing):/i, "").trim(),
+    property: propertyLine.replace(/^(property|address|home|listing|interested in):/i, "").trim(),
     price: text.match(/\$[\d,]+(?:\s*-\s*\$?[\d,]+)?/)?.[0] || "",
     urgency: /tour|showing|today|asap|pre-approved|preapproved/i.test(text) ? "Hot" : "Warm",
-    message: text.slice(0, 600),
+    message: (messageLine ? messageLine.replace(/^(message|comments|note|inquiry):/i, "").trim() : text).slice(0, 800),
+    raw: text,
   };
+}
+
+function renderParsedLeadPreview(lead) {
+  const preview = document.querySelector("#parsedLeadPreview");
+  preview.classList.remove("hidden");
+  preview.innerHTML = `
+    <div class="section-title">
+      <h3>Review before sending</h3>
+      <span>${escapeHtml(lead.source)} · ${escapeHtml(lead.urgency)}</span>
+    </div>
+    <div class="preview-grid">
+      <div><span>Name</span><strong>${escapeHtml(lead.name || "New Lead")}</strong></div>
+      <div><span>Type</span><strong>${escapeHtml(lead.type || "Buyer")}</strong></div>
+      <div><span>Phone</span><strong>${escapeHtml(lead.phone || "Not found")}</strong></div>
+      <div><span>Email</span><strong>${escapeHtml(lead.email || "Not found")}</strong></div>
+      <div><span>Property / area</span><strong>${escapeHtml(lead.property || "Not found")}</strong></div>
+      <div><span>Price</span><strong>${escapeHtml(lead.price || "Not found")}</strong></div>
+    </div>
+    <p>${escapeHtml(lead.message || "No message found.")}</p>
+  `;
 }
 
 function createLeadFromEmail() {
@@ -1029,8 +1063,33 @@ function createLeadFromEmail() {
     showToast("Paste the lead email first.");
     return;
   }
-  const parsed = parseLeadEmail(text);
-  openLeadDialog(parsed);
+  parsedLeadDraft = parseLeadEmail(text);
+  renderParsedLeadPreview(parsedLeadDraft);
+  document.querySelector("#createParsedLeadButton").classList.remove("hidden");
+  showToast("Lead preview ready. Review before sending.");
+}
+
+async function createParsedLeadAndNotify() {
+  if (!parsedLeadDraft) {
+    showToast("Preview a lead first.");
+    return;
+  }
+  try {
+    const result = await authenticatedAppApiRequest("/api/manual-lead", {
+      method: "POST",
+      body: JSON.stringify(parsedLeadDraft),
+    });
+    await refreshFromCloud({ silent: true });
+    document.querySelector("#leadEmailText").value = "";
+    document.querySelector("#parsedLeadPreview").classList.add("hidden");
+    document.querySelector("#createParsedLeadButton").classList.add("hidden");
+    parsedLeadDraft = null;
+    switchView("dashboard");
+    const pushed = (result.notifications || []).filter((entry) => entry.push).length;
+    showToast(`Lead created. Push sent to ${pushed} team member(s).`);
+  } catch (error) {
+    showToast(`Create failed: ${error.message}`);
+  }
 }
 
 function exportData() {
@@ -1343,6 +1402,7 @@ document.querySelector("#teamForm").addEventListener("submit", (event) => {
 });
 
 document.querySelector("#parseEmailButton").addEventListener("click", createLeadFromEmail);
+document.querySelector("#createParsedLeadButton").addEventListener("click", createParsedLeadAndNotify);
 document.querySelector("#loadSampleButton").addEventListener("click", loadSampleEmail);
 document.querySelector("#leadSearch").addEventListener("input", (event) => {
   searchTerm = event.target.value;
