@@ -4,6 +4,7 @@ const SETTINGS_KEY = "lead-router-settings-v1";
 const CLOUD_SESSION_KEY = "lead-router-cloud-session-v1";
 const MY_OWNER_KEY = "lead-router-my-owner-v1";
 const ACCOUNT_ROLE_KEY = "lead-router-account-role-v1";
+const LAST_AUTO_SYNC_KEY = "lead-router-last-auto-sync-v1";
 const SUPABASE_URL = "https://bzjsalaacldusmswkygw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wvNqklMeEgNe21HquCDiWg_F22bTjMA";
 const CLOUD_RECORD_ID = "lead-router-shared-workspace";
@@ -85,6 +86,9 @@ let myOwner = localStorage.getItem(MY_OWNER_KEY) || "";
 let accountRole = localStorage.getItem(ACCOUNT_ROLE_KEY) || "master";
 let cloudSession = loadCloudSession();
 let parsedLeadDraft = null;
+let autoSyncTimer = null;
+let syncState = "idle";
+let lastAutoSync = localStorage.getItem(LAST_AUTO_SYNC_KEY) || "";
 
 team = team.map((member) => ({
   ...member,
@@ -226,7 +230,10 @@ async function refreshFromCloud(options = {}) {
       applySnapshot(rows[0].data);
       if (!options.silent) showToast("Cloud data refreshed.");
     } else if (!options.silent) {
-      showToast("No cloud data yet. Upload local data to start.");
+      await syncCloudSnapshot({ silent: true });
+      showToast("Cloud workspace started and local data saved.");
+    } else {
+      await syncCloudSnapshot({ silent: true });
     }
   } catch (error) {
     showToast(`Refresh failed: ${error.message}`);
@@ -239,6 +246,8 @@ async function syncCloudSnapshot(options = {}) {
     return;
   }
   try {
+    syncState = "saving";
+    renderSyncStatus();
     await supabaseRequest("/rest/v1/lead_router_records?on_conflict=id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates" },
@@ -248,16 +257,30 @@ async function syncCloudSnapshot(options = {}) {
         data: localSnapshot(),
       }),
     });
+    syncState = "saved";
+    lastAutoSync = new Date().toISOString();
+    localStorage.setItem(LAST_AUTO_SYNC_KEY, lastAutoSync);
     renderSyncStatus();
-    if (!options.silent) showToast("Local lead data uploaded to Supabase.");
+    if (!options.silent) showToast("Lead data saved to Supabase.");
   } catch (error) {
-    showToast(`Upload failed: ${error.message}`);
+    syncState = "error";
+    renderSyncStatus();
+    showToast(`Auto-save failed: ${error.message}`);
   }
 }
 
 function saveAndSync(options = {}) {
   saveAll();
-  if (cloudSession?.access_token) syncCloudSnapshot({ silent: options.silent !== false });
+  if (!cloudSession?.access_token) {
+    renderSyncStatus();
+    return;
+  }
+  window.clearTimeout(autoSyncTimer);
+  syncState = "pending";
+  renderSyncStatus();
+  autoSyncTimer = window.setTimeout(() => {
+    syncCloudSnapshot({ silent: options.silent !== false });
+  }, options.immediate ? 0 : 900);
 }
 
 function escapeHtml(value) {
@@ -807,9 +830,17 @@ function renderSettings() {
 function renderSyncStatus() {
   const signedIn = Boolean(cloudSession?.access_token);
   const pushAvailable = "serviceWorker" in navigator && "PushManager" in window && location.protocol !== "file:";
-  document.querySelector("#syncStatus").textContent = signedIn ? "Connected to Supabase" : "Local mode";
+  const syncLabels = {
+    pending: "Auto-save pending",
+    saving: "Saving to cloud...",
+    saved: "Auto-saved",
+    error: "Auto-save needs attention",
+    idle: "Connected to Supabase",
+  };
+  const lastSavedText = lastAutoSync ? ` Last saved ${dateTimeLabel(lastAutoSync)}.` : "";
+  document.querySelector("#syncStatus").textContent = signedIn ? syncLabels[syncState] || syncLabels.idle : "Local mode";
   document.querySelector("#syncHelper").textContent = signedIn
-    ? "Cloud sharing is on. Refresh before working, and upload after local imports."
+    ? `Changes save automatically.${lastSavedText} Use Refresh if another device changed leads.`
     : "Sign in to share leads and claims with the team.";
   document.querySelector("#authForm").classList.toggle("hidden", signedIn);
   document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn);

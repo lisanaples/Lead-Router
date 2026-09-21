@@ -1,15 +1,15 @@
 :root {
-  --ink: #172a34;
-  --muted: #64727c;
-  --line: #d8e1e5;
+  --ink: #18213d;
+  --muted: #66708d;
+  --line: #dce2f2;
   --surface: #ffffff;
-  --surface-soft: #f5f8f8;
-  --teal: #0f766e;
-  --teal-dark: #0e4652;
-  --gold: #d09538;
-  --rose: #b94d47;
-  --sage: #8da989;
-  --shadow: 0 18px 48px rgba(20, 42, 52, 0.14);
+  --surface-soft: #f4f7ff;
+  --teal: #2563eb;
+  --teal-dark: #2434a6;
+  --gold: #9ade49;
+  --rose: #e5487b;
+  --sage: #20bfd4;
+  --shadow: 0 18px 48px rgba(36, 52, 166, 0.14);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -20,8 +20,9 @@
 body {
   margin: 0;
   background:
-    linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(208, 149, 56, 0.1)),
-    #f6f8f8;
+    radial-gradient(circle at top left, rgba(32, 191, 212, 0.18), transparent 34%),
+    linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(154, 222, 73, 0.12)),
+    #f5f7ff;
   color: var(--ink);
 }
 
@@ -47,7 +48,7 @@ button {
   flex-direction: column;
   gap: 22px;
   padding: 24px;
-  background: #123846;
+  background: linear-gradient(180deg, #1d267f, #2532a3 58%, #16205c);
   color: white;
 }
 
@@ -63,8 +64,8 @@ button {
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--gold), #f1c16f);
-  color: #122a35;
+  background: linear-gradient(135deg, #9ade49, #28d6ed);
+  color: #161f55;
   font-weight: 950;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
 }
@@ -98,7 +99,7 @@ button {
 .nav-item.active,
 .nav-item:hover {
   background: white;
-  color: #123846;
+  color: #2434a6;
 }
 
 .sidebar-panel {
@@ -736,7 +737,7 @@ label {
   opacity: 0;
   border-radius: 8px;
   padding: 12px 14px;
-  background: #123846;
+  background: #2434a6;
   color: white;
   font-weight: 850;
   transition: 160ms ease;

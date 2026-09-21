@@ -35,7 +35,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 5. Create a separate Supabase project for this app.
 6. Run `supabase-setup.sql` in the new Supabase project.
 7. Upload the updated files to GitHub and let Vercel redeploy.
-8. Sign in inside the app, then use **Upload local data** once to seed the shared cloud workspace.
+8. Sign in inside the app. The app will start the shared cloud workspace and auto-save changes after edits.
 
 ## Connected lead intake and notifications
 

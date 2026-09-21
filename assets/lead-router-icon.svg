@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lead Router">
+  <rect width="512" height="512" rx="112" fill="#2434a6"/>
+  <path d="M126 154h124c68 0 123 55 123 123v38" fill="none" stroke="#28d6ed" stroke-width="44" stroke-linecap="round"/>
+  <path d="M336 278l44 44 44-44" fill="none" stroke="#9ade49" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="126" cy="154" r="44" fill="#9ade49"/>
+  <circle cx="256" cy="154" r="28" fill="#ffffff"/>
+  <circle cx="380" cy="344" r="44" fill="#28d6ed"/>
+  <text x="128" y="398" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="112" font-weight="900" letter-spacing="-6">LR</text>
+</svg>
