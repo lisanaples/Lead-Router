@@ -12,10 +12,13 @@ function optionalEnv(name) {
 }
 
 function supabaseBaseUrl() {
-  return requiredEnv("SUPABASE_URL")
+  let value = requiredEnv("SUPABASE_URL")
     .trim()
+    .replace(/^['"]|['"]$/g, "")
     .replace(/\/rest\/v1\/?$/i, "")
     .replace(/\/+$/, "");
+  if (value && !/^https?:\/\//i.test(value)) value = `https://${value}`;
+  return value;
 }
 
 function setCors(response) {
@@ -349,5 +352,6 @@ module.exports = {
   readBody,
   sendTestPush,
   saveWorkspace,
+  supabaseBaseUrl,
   verifyUserToken,
 };
