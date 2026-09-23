@@ -11,6 +11,7 @@ const CLOUD_RECORD_ID = "lead-router-shared-workspace";
 const TEAM_STATUSES = ["Available", "On call", "Backup only", "Paused", "Out of office", "Admin only"];
 const ROUTING_STATUSES = ["Available", "On call"];
 const FULL_ACCESS_ROLES = ["Full access"];
+const MASTER_EMAILS = ["lisanaplesrealtor@gmail.com"];
 const PIPELINE_GROUPS = [
   { key: "hot", label: "Hot" },
   { key: "warm", label: "Warm" },
@@ -64,7 +65,7 @@ const sampleLeads = [
 ];
 
 const sampleTeam = [
-  { id: 1, name: "Lisa", phone: "717-555-0101", email: "lisa@example.com", status: "Available", accessRole: "Full access", inviteStatus: "Account created", claims: 1 },
+  { id: 1, name: "Lisa", phone: "717-555-0101", email: "lisanaplesrealtor@gmail.com", status: "Available", accessRole: "Full access", inviteStatus: "Account created", claims: 1 },
   { id: 2, name: "Assistant", phone: "717-555-0102", email: "assistant@example.com", status: "Available", accessRole: "Full access", inviteStatus: "Not invited", claims: 0 },
   { id: 3, name: "Buyer Agent", phone: "717-555-0103", email: "buyeragent@example.com", status: "On call", accessRole: "Team member", inviteStatus: "Not invited", claims: 0 },
 ];
@@ -181,13 +182,18 @@ async function supabaseRequest(path, options = {}) {
 }
 
 async function appApiRequest(path, options = {}) {
-  const response = await fetch(path, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error("The Lead Router API did not respond. Open the Vercel app, make sure the api folder was uploaded, and redeploy.");
+  }
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.error || data?.message || "Lead Router request failed.");
@@ -373,6 +379,10 @@ function signedInEmail() {
   return normalizedEmail(cloudSession?.user?.email || jwtPayload(cloudSession?.access_token).email);
 }
 
+function isMasterEmail(email = signedInEmail()) {
+  return MASTER_EMAILS.includes(normalizedEmail(email));
+}
+
 function teamMemberForEmail(email = signedInEmail()) {
   const target = normalizedEmail(email);
   if (!target) return null;
@@ -384,6 +394,18 @@ function fullAccessFor(member) {
 }
 
 function applySignedInTeamAccess() {
+  if (isMasterEmail()) {
+    const lisa = team.find((member) => member.name.toLowerCase() === "lisa") || team[0];
+    if (lisa) {
+      lisa.email = lisa.email || signedInEmail();
+      lisa.accessRole = "Full access";
+      myOwner = lisa.name;
+      localStorage.setItem(MY_OWNER_KEY, myOwner);
+    }
+    accountRole = "master";
+    localStorage.setItem(ACCOUNT_ROLE_KEY, accountRole);
+    return;
+  }
   const member = teamMemberForEmail();
   if (!member) return;
   myOwner = member.name;
@@ -406,7 +428,7 @@ function canManageAll() {
 function applyAccountAccess() {
   if (cloudSession?.access_token) applySignedInTeamAccess();
   document.querySelector("#accountRoleSelect").value = accountRole;
-  document.querySelector("#accountRoleSelect").disabled = Boolean(teamMemberForEmail());
+  document.querySelector("#accountRoleSelect").disabled = Boolean(teamMemberForEmail()) && !isMasterEmail();
   document.querySelectorAll(".master-only").forEach((element) => {
     element.classList.toggle("hidden", !canManageAll());
   });
