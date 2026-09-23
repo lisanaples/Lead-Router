@@ -1,6 +1,6 @@
-# Gmail Auto Intake for Lead Router
+# Gmail Auto Intake for Lead Relay
 
-This setup lets lead emails go directly into Lead Router without copying and pasting.
+This setup lets lead emails go directly into Lead Relay without copying and pasting.
 
 ## Recommended Email Address
 
@@ -23,7 +23,7 @@ That address can forward into the Gmail inbox if needed.
 In Gmail, create this label:
 
 ```text
-Lead Router Intake
+Lead Relay Intake
 ```
 
 The script will only process emails with this label.
@@ -34,7 +34,7 @@ In Gmail, create filters for lead senders such as Zillow, Realtor.com, Homes.com
 
 For each filter:
 
-- Apply the label: `Lead Router Intake`
+- Apply the label: `Lead Relay Intake`
 - Do not mark as spam
 - Optional: Mark as important
 
@@ -49,7 +49,7 @@ https://script.google.com
 Create a new project named:
 
 ```text
-Lead Router Gmail Intake
+Lead Relay Gmail Intake
 ```
 
 Delete the starter code and paste this:
@@ -58,9 +58,9 @@ Delete the starter code and paste this:
 const LEAD_ROUTER_WEBHOOK =
   "https://lead-router-29yb.vercel.app/api/inbound-lead?secret=PASTE_YOUR_SECRET_HERE";
 
-const INTAKE_LABEL = "Lead Router Intake";
-const PROCESSED_LABEL = "Lead Router Processed";
-const ERROR_LABEL = "Lead Router Error";
+const INTAKE_LABEL = "Lead Relay Intake";
+const PROCESSED_LABEL = "Lead Relay Processed";
+const ERROR_LABEL = "Lead Relay Error";
 
 function sendLeadEmailsToLeadRouter() {
   const intakeLabel = GmailApp.getUserLabelByName(INTAKE_LABEL);
@@ -101,7 +101,7 @@ function sendLeadEmailsToLeadRouter() {
 
       const code = response.getResponseCode();
       if (code < 200 || code >= 300) {
-        throw new Error(`Lead Router returned ${code}: ${response.getContentText()}`);
+        throw new Error(`Lead Relay returned ${code}: ${response.getContentText()}`);
       }
 
       thread.addLabel(processedLabel);
@@ -149,17 +149,17 @@ In Google Apps Script:
 4. Google will ask for permission.
 5. Approve the script.
 
-Then send or move one test lead email into the `Lead Router Intake` label and run the function again.
+Then send or move one test lead email into the `Lead Relay Intake` label and run the function again.
 
 If it works:
 
-- the lead appears in Lead Router
+- the lead appears in Lead Relay
 - active/on-call team members receive push/email alerts
-- the Gmail thread moves from `Lead Router Intake` to `Lead Router Processed`
+- the Gmail thread moves from `Lead Relay Intake` to `Lead Relay Processed`
 
 If it fails:
 
-- the Gmail thread gets the label `Lead Router Error`
+- the Gmail thread gets the label `Lead Relay Error`
 
 ## Step 5: Make It Automatic
 
@@ -173,5 +173,5 @@ In Google Apps Script:
 6. Interval: every **5 minutes**
 7. Save.
 
-Now Gmail will check for new lead emails every few minutes and send them to Lead Router automatically.
+Now Gmail will check for new lead emails every few minutes and send them to Lead Relay automatically.
 

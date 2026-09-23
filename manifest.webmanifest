@@ -1,7 +1,7 @@
 {
-  "name": "Lead Router",
-  "short_name": "Lead Router",
-  "description": "A first-to-claim real estate lead routing prototype.",
+  "name": "Lead Relay",
+  "short_name": "Lead Relay",
+  "description": "A first-to-claim real estate lead relay app.",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#123849",

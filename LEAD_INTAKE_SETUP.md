@@ -24,18 +24,18 @@ This setup receives leads from Zillow, Reminder Media, Realtor.com, Homes.com, H
 
 ## Vercel environment variables
 
-In Vercel, open the Lead Router project, then go to **Settings > Environment Variables**.
+In Vercel, open the Lead Relay project, then go to **Settings > Environment Variables**.
 
 Add these:
 
 | Name | What it is |
 | --- | --- |
-| `SUPABASE_URL` | Your Lead Router Supabase project URL, such as `https://your-project.supabase.co` |
+| `SUPABASE_URL` | Your Lead Relay Supabase project URL, such as `https://your-project.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key, not the public key |
 | `LEAD_ROUTER_APP_URL` | Your app link, such as `https://lead-router-29yb.vercel.app` |
 | `LEAD_ROUTER_INTAKE_SECRET` | A private password you make up for incoming lead webhooks |
 | `RESEND_API_KEY` | Email provider API key |
-| `EMAIL_FROM` | Verified sender email, such as `Lead Router <leads@yourdomain.com>` |
+| `EMAIL_FROM` | Verified sender email, such as `Lead Relay <leads@yourdomain.com>` |
 | `VAPID_PUBLIC_KEY` | Public key for browser push notifications |
 | `VAPID_PRIVATE_KEY` | Private key for browser push notifications |
 | `VAPID_SUBJECT` | Contact email for push, such as `mailto:lisa@example.com` |
@@ -94,7 +94,7 @@ On iPhone, push alerts usually require opening the installed Home Screen app, no
 
 ## Lead source setup
 
-Most portals send lead notifications by email. To get those into Lead Router, use an email parser or automation service, such as:
+Most portals send lead notifications by email. To get those into Lead Relay, use an email parser or automation service, such as:
 
 - Zapier Email Parser
 - Make.com

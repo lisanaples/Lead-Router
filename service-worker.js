@@ -1,9 +1,9 @@
-const CACHE_NAME = "lead-router-v26";
+const CACHE_NAME = "lead-router-v29";
 const APP_SHELL = [
   "./",
   "index.html",
-  "styles.css?v=26",
-  "app.js?v=26",
+  "styles.css?v=29",
+  "app.js?v=29",
   "assets/lead-router-icon.svg",
   "manifest.webmanifest"
 ];
@@ -41,8 +41,8 @@ self.addEventListener("fetch", (event) => {
 self.addEventListener("push", (event) => {
   const data = event.data ? event.data.json() : {};
   event.waitUntil(
-    self.registration.showNotification(data.title || "New Lead Router lead", {
-      body: data.body || "Open Lead Router to review this lead.",
+    self.registration.showNotification(data.title || "New Lead Relay lead", {
+      body: data.body || "Open Lead Relay to review this lead.",
       data: { url: data.url || "./" },
     })
   );

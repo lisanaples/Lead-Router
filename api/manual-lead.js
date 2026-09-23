@@ -29,7 +29,7 @@ module.exports = async function handler(request, response) {
     const lead = leadFromPayload(payload);
     lead.activity.unshift({
       at: new Date().toISOString(),
-      text: "Lead created from pasted email inside Lead Router.",
+      text: "Lead created from pasted email inside Lead Relay.",
     });
     workspace.leads.unshift(lead);
     const notifications = await notifyActiveTeam(workspace, lead);

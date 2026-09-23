@@ -1,4 +1,4 @@
-# Lead Router
+# Lead Relay
 
 This is a separate prototype for a FiveStreet-style real estate lead routing app.
 

@@ -21,7 +21,7 @@ module.exports = async function handler(request, response) {
   if (request.method === "GET") {
     response.status(200).json({
       ok: true,
-      message: "Lead Router intake is ready. Send POST requests with the x-lead-router-secret header.",
+      message: "Lead Relay intake is ready. Send POST requests with the x-lead-router-secret header.",
       acceptedFields: ["source", "type", "name", "phone", "email", "property", "price", "urgency", "message", "raw"],
     });
     return;

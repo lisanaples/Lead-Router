@@ -1,13 +1,13 @@
 const LEAD_ROUTER_WEBHOOK = "https://lead-router-29yb.vercel.app/api/inbound-lead?secret=PASTE_YOUR_SECRET_HERE";
 
-const INTAKE_LABEL = "Lead Router Intake";
-const PROCESSED_LABEL = "Lead Router Processed";
-const ERROR_LABEL = "Lead Router Error";
+const INTAKE_LABEL = "Lead Relay Intake";
+const PROCESSED_LABEL = "Lead Relay Processed";
+const ERROR_LABEL = "Lead Relay Error";
 
 function sendLeadEmailsToLeadRouter() {
   const intakeLabel = GmailApp.getUserLabelByName(INTAKE_LABEL);
   if (!intakeLabel) {
-    throw new Error("Missing Gmail label: Lead Router Intake");
+    throw new Error("Missing Gmail label: Lead Relay Intake");
   }
 
   const processedLabel = getOrCreateLabel(PROCESSED_LABEL);
@@ -44,7 +44,7 @@ function sendLeadEmailsToLeadRouter() {
 
       const code = response.getResponseCode();
       if (code < 200 || code >= 300) {
-        throw new Error("Lead Router returned " + code + ": " + response.getContentText());
+        throw new Error("Lead Relay returned " + code + ": " + response.getContentText());
       }
 
       thread.addLabel(processedLabel);

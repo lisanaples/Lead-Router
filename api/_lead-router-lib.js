@@ -291,7 +291,7 @@ async function sendTestPush(owner, workspace) {
   if (!member) return { sent: false, error: "That team member was not found." };
   const lead = {
     id: "test",
-    source: "Lead Router",
+    source: "Lead Relay",
     type: "Test",
     name: "Push notification test",
     property: "Your device is connected",

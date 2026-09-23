@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Lead Router Prototype</title>
+    <title>Lead Relay</title>
     <meta name="theme-color" content="#123849" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=26" />
+    <link rel="stylesheet" href="styles.css?v=29" />
   </head>
   <body>
     <main class="app-shell">
@@ -16,11 +16,11 @@
         <div class="brand">
           <img class="brand-mark" src="assets/lead-router-icon.svg" alt="" />
           <div>
-            <strong>Lead Router</strong>
-            <span>First-to-claim lead desk</span>
+            <strong>Lead Relay</strong>
+            <span>First-to-claim lead routing</span>
           </div>
         </div>
-        <nav class="nav-list" aria-label="Lead router sections">
+        <nav class="nav-list" aria-label="Lead Relay sections">
           <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
           <button class="nav-item" type="button" data-view="myLeads">My Leads</button>
           <button class="nav-item" type="button" data-view="inbox">Lead Inbox</button>
@@ -41,7 +41,7 @@
             <img class="dashboard-logo" src="assets/lead-router-icon.svg" alt="" />
             <div>
               <span class="eyebrow">Lead response</span>
-              <h1>Claim the right lead fast</h1>
+              <h1>Route. Claim. Convert.</h1>
             </div>
           </div>
           <div class="topbar-actions">
@@ -195,6 +195,7 @@
                   <option value="new">Unclaimed</option>
                   <option value="claimed">Claimed</option>
                   <option value="attempted">Contact attempted</option>
+                  <option value="noContact">No contact made</option>
                   <option value="contacted">Contacted</option>
                   <option value="appointment">Appointment set</option>
                   <option value="consultation">Consultation completed</option>
@@ -247,12 +248,21 @@
             <div class="panel-header">
               <div>
                 <span class="eyebrow">Reports</span>
-                <h2>Weekly Check-Ins</h2>
-                <p>Leads with follow-ups due this week, overdue, or missing a next step.</p>
+                <h2>Lead Performance</h2>
+                <p>Track leads received, contact results, archives, owners, and sources.</p>
               </div>
-              <button class="ghost-button" type="button" id="downloadReportButton">Download report</button>
+              <div class="filter-row">
+                <select id="reportRangeSelect">
+                  <option value="week">This week</option>
+                  <option value="month">This month</option>
+                  <option value="year">This year</option>
+                  <option value="all">All time</option>
+                </select>
+                <button class="ghost-button" type="button" id="downloadReportButton">Download report</button>
+              </div>
             </div>
             <section class="metrics-grid report-metrics" id="reportMetrics"></section>
+            <div class="report-grid" id="leadPerformanceReport"></div>
             <div class="report-table" id="weeklyCheckInReport"></div>
           </section>
 
@@ -348,6 +358,7 @@
               <option value="new">Unclaimed</option>
               <option value="claimed">Claimed</option>
               <option value="attempted">Contact attempted</option>
+              <option value="noContact">No contact made</option>
               <option value="contacted">Contacted</option>
               <option value="appointment">Appointment set</option>
               <option value="consultation">Consultation completed</option>
@@ -382,13 +393,34 @@
         <section class="tracking-section engagement-section">
           <div class="section-title">
             <h3>Engagement drafts</h3>
-            <span>Email / text starters</span>
+            <span>Buyer / seller starters</span>
           </div>
-          <div class="button-row">
-            <button class="ghost-button" type="button" data-draft-type="first-response">First response</button>
-            <button class="ghost-button" type="button" data-draft-type="showing">Showing follow-up</button>
-            <button class="ghost-button" type="button" data-draft-type="seller">Seller inquiry</button>
-            <button class="ghost-button" type="button" data-draft-type="text">Quick text</button>
+          <div class="draft-groups">
+            <div>
+              <strong>Buyer leads</strong>
+              <div class="button-row">
+                <button class="ghost-button" type="button" data-draft-type="buyer-text">Quick buyer text</button>
+                <button class="ghost-button" type="button" data-draft-type="buyer-email">Buyer first email</button>
+                <button class="ghost-button" type="button" data-draft-type="showing">Showing request</button>
+                <button class="ghost-button" type="button" data-draft-type="buyer-preapproval">Pre-approval nudge</button>
+              </div>
+            </div>
+            <div>
+              <strong>Seller leads</strong>
+              <div class="button-row">
+                <button class="ghost-button" type="button" data-draft-type="seller-text">Quick seller text</button>
+                <button class="ghost-button" type="button" data-draft-type="seller-email">Seller first email</button>
+                <button class="ghost-button" type="button" data-draft-type="seller-value">Home value angle</button>
+                <button class="ghost-button" type="button" data-draft-type="seller-prep">Prep call</button>
+              </div>
+            </div>
+            <div>
+              <strong>Follow-up</strong>
+              <div class="button-row">
+                <button class="ghost-button" type="button" data-draft-type="still-interested">Still interested?</button>
+                <button class="ghost-button" type="button" data-draft-type="no-pressure">No-pressure check-in</button>
+              </div>
+            </div>
           </div>
           <textarea id="engagementDraft" readonly placeholder="Choose a draft to prepare a message for this lead."></textarea>
           <div class="button-row">
@@ -444,7 +476,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=26"></script>
+    <script src="app.js?v=29"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

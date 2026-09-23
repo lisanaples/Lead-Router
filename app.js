@@ -16,6 +16,7 @@ const PIPELINE_GROUPS = [
   { key: "hot", label: "Hot" },
   { key: "warm", label: "Warm" },
   { key: "attempted", label: "Attempted" },
+  { key: "noContact", label: "No contact made" },
   { key: "contacted", label: "Contacted" },
   { key: "appointment", label: "Appointment set" },
   { key: "consultation", label: "Consultation" },
@@ -71,7 +72,7 @@ const sampleTeam = [
 ];
 
 const defaultSettings = {
-  notificationTemplate: "New {source} lead: {name}, {type}, {property}. Open Lead Router to claim it.",
+  notificationTemplate: "New {source} lead: {name}, {type}, {property}. Open Lead Relay to claim it.",
   allowReclaim: true,
   notifyAll: true,
 };
@@ -83,6 +84,7 @@ let activeView = "dashboard";
 let searchTerm = "";
 let statusFilter = "all";
 let ownerFilter = "all";
+let reportRange = "week";
 let workflowOwner = "";
 let myOwner = localStorage.getItem(MY_OWNER_KEY) || "";
 let accountRole = localStorage.getItem(ACCOUNT_ROLE_KEY) || "master";
@@ -194,11 +196,11 @@ async function appApiRequest(path, options = {}) {
       },
     });
   } catch {
-    throw new Error("The Lead Router API did not respond. Open the Vercel app, make sure the api folder was uploaded, and redeploy.");
+    throw new Error("The Lead Relay API did not respond. Open the Vercel app, make sure the api folder was uploaded, and redeploy.");
   }
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
-  if (!response.ok) throw new Error(data?.error || data?.message || "Lead Router request failed.");
+  if (!response.ok) throw new Error(data?.error || data?.message || "Lead Relay request failed.");
   return data;
 }
 
@@ -348,17 +350,49 @@ function leadAge(value) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
+function reportRangeLabel() {
+  const labels = {
+    week: "this week",
+    month: "this month",
+    year: "this year",
+    all: "all time",
+  };
+  return labels[reportRange] || labels.week;
+}
+
+function startOfReportRange() {
+  const now = new Date();
+  if (reportRange === "all") return null;
+  if (reportRange === "year") return new Date(now.getFullYear(), 0, 1);
+  if (reportRange === "month") return new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+}
+
+function leadInReportRange(lead) {
+  const start = startOfReportRange();
+  if (!start) return true;
+  return new Date(lead.createdAt) >= start;
+}
+
+function madeContact(lead) {
+  return ["contacted", "appointment", "consultation", "converted", "closed"].includes(lead.status);
+}
+
 function statusLabel(status) {
   const labels = {
     new: "Unclaimed",
     claimed: "Claimed",
     attempted: "Contact attempted",
+    noContact: "No contact made",
     contacted: "Contacted",
     appointment: "Appointment set",
     consultation: "Consultation completed",
     converted: "Converted",
     nurture: "Nurture",
-    doNotContact: "Do not contact",
+    doNotContact: "Archived - do not contact",
     lost: "Lost",
     closed: "Closed sale",
   };
@@ -605,9 +639,11 @@ function leadCard(lead, compact = false) {
         ${lead.status === "new" ? claimButtons(lead) : ""}
         ${compact ? "" : `
           <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
+          <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="noContact">No contact</button>
           <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="contacted">Contacted</button>
           <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="appointment">Appointment</button>
           <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="nurture">Nurture</button>
+          <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="doNotContact">Archive DNC</button>
         `}
       </div>
     </article>
@@ -739,6 +775,7 @@ function pipelineGroupKey(lead) {
   if (lead.status === "consultation") return "consultation";
   if (lead.status === "appointment") return "appointment";
   if (lead.status === "contacted") return "contacted";
+  if (lead.status === "noContact") return "noContact";
   if (lead.status === "attempted") return "attempted";
   if (lead.urgency === "Hot") return "hot";
   if (lead.urgency === "Warm") return "warm";
@@ -776,8 +813,10 @@ function workflowLeadCard(lead) {
       <div class="lead-actions">
         <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="noContact">No contact</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="contacted">Contacted</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="appointment">Appointment</button>
+        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="doNotContact">Archive DNC</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
         <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
@@ -864,18 +903,76 @@ function statRows(title, totals) {
   `;
 }
 
+function percentLabel(value, total) {
+  if (!total) return "0%";
+  return `${Math.round((value / total) * 100)}%`;
+}
+
+function reportScope() {
+  return visibleLeads().filter(leadInReportRange);
+}
+
+function ownerPerformanceRows(scope) {
+  const owners = canManageAll()
+    ? team.map((member) => member.name)
+    : [myOwner];
+  const assignedOwners = [...new Set(scope.map((lead) => lead.assignedTo).filter(Boolean))];
+  const rowOwners = [...new Set([...owners, ...assignedOwners])].filter(Boolean);
+  return rowOwners.map((owner) => {
+    const ownerLeadsForRange = scope.filter((lead) => lead.assignedTo === owner);
+    const contacted = ownerLeadsForRange.filter(madeContact).length;
+    const noContact = ownerLeadsForRange.filter((lead) => lead.status === "noContact").length;
+    const archived = ownerLeadsForRange.filter((lead) => lead.status === "doNotContact").length;
+    return { owner, total: ownerLeadsForRange.length, contacted, noContact, archived };
+  }).filter((row) => row.total || canManageAll());
+}
+
+function ownerPerformanceReport(scope) {
+  const rows = ownerPerformanceRows(scope);
+  return `
+    <article class="report-card wide-report-card">
+      <h3>${canManageAll() ? "Team member performance" : "My lead performance"}</h3>
+      ${rows.length ? rows.map((row) => `
+        <div class="performance-row">
+          <strong>${escapeHtml(row.owner)}</strong>
+          <span>${row.total} received</span>
+          <span>${row.contacted} contacted (${percentLabel(row.contacted, row.total)})</span>
+          <span>${row.noContact} no contact</span>
+          <span>${row.archived} archived DNC</span>
+        </div>
+      `).join("") : `<div class="empty-state">No leads in this range.</div>`}
+    </article>
+  `;
+}
+
 function renderReports() {
-  const scope = visibleLeads();
+  const rangeSelect = document.querySelector("#reportRangeSelect");
+  if (rangeSelect) rangeSelect.value = reportRange;
+  const scope = reportScope();
   const active = scope.filter((lead) => !["closed", "converted", "lost", "doNotContact"].includes(lead.status));
   const weekly = weeklyCheckInLeads();
   const overdue = weekly.filter((lead) => lead.checkInStatus === "Overdue").length;
   const noDate = weekly.filter((lead) => lead.checkInStatus === "Needs follow-up date").length;
+  const contacted = scope.filter(madeContact).length;
+  const noContact = scope.filter((lead) => lead.status === "noContact").length;
+  const archived = scope.filter((lead) => lead.status === "doNotContact").length;
   document.querySelector("#reportMetrics").innerHTML = [
-    metricCard("Weekly check-ins", weekly.length, "Due or missing next step"),
-    metricCard("Overdue", overdue, "Past follow-up date"),
-    metricCard("No follow-up date", noDate, "Needs next step"),
+    metricCard("Leads received", scope.length, reportRangeLabel()),
+    metricCard("Made contact", contacted, `${percentLabel(contacted, scope.length)} of received`),
+    metricCard("No contact made", noContact, `${percentLabel(noContact, scope.length)} of received`),
+    metricCard("Archived DNC", archived, "Requested no contact"),
     metricCard("Active funnel", active.length, "Open leads"),
-    metricCard("Converted", scope.filter((lead) => lead.status === "converted").length, "Became clients"),
+    metricCard("Due follow-ups", weekly.length, `${overdue} overdue · ${noDate} no date`),
+  ].join("");
+  document.querySelector("#leadPerformanceReport").innerHTML = [
+    ownerPerformanceReport(scope),
+    statRows("Lead sources", countBy(scope, (lead) => lead.source || "Unknown source")),
+    statRows("Contact outcomes", {
+      "Made contact": contacted,
+      "No contact made": noContact,
+      "Requested no contact / archived": archived,
+      "Not worked yet": scope.filter((lead) => ["new", "claimed"].includes(lead.status)).length,
+    }),
   ].join("");
   document.querySelector("#weeklyCheckInReport").innerHTML = weekly.length ? weekly.map((lead) => `
     <div class="table-row report-row">
@@ -1004,16 +1101,43 @@ function leadDraft(type) {
   const lead = currentLeadFromForm();
   const greeting = `Hi ${firstName(lead.name)},`;
   const propertyLine = lead.property ? ` about ${lead.property}` : "";
-  if (type === "text") {
-    return `${greeting} this is Lisa Naples. I received your ${lead.source} inquiry${propertyLine} and wanted to reach out quickly. Are you available for a quick call or text conversation?`;
+  const buyerNeed = lead.property
+    ? `I saw your inquiry about ${lead.property}.`
+    : "I saw your inquiry and would love to help you with the next step.";
+  const sellerNeed = lead.property
+    ? `I saw your inquiry about ${lead.property}.`
+    : "I saw your inquiry about selling and would be happy to help.";
+  if (type === "buyer-text") {
+    return `${greeting} this is Lisa Naples. ${buyerNeed} Are you hoping to see it, get more details, or talk through whether it could be a good fit?`;
+  }
+  if (type === "buyer-email") {
+    return `${greeting}\n\nThank you for reaching out through ${lead.source}. ${buyerNeed}\n\nI can help with the property details, showing availability, recent comparable sales, and how it may fit what you are looking for.\n\nWhat is the best next step for you: setting up a showing, getting more information first, or talking through your search goals?\n\nThanks,\nLisa`;
   }
   if (type === "showing") {
-    return `${greeting}\n\nThank you for reaching out${propertyLine}. I would be happy to help with details and next steps.\n\nAre there specific times that work best for you to see the property or talk through what you are looking for?\n\nThanks,\nLisa`;
+    return `${greeting}\n\nThank you for reaching out${propertyLine}. I can check showing availability and help coordinate a time that works.\n\nAre you available today or tomorrow, and are there any must-have questions you want me to look into before we schedule?\n\nThanks,\nLisa`;
   }
-  if (type === "seller") {
-    return `${greeting}\n\nThank you for reaching out about selling. I would be happy to help you understand timing, value, preparation, and next steps.\n\nA quick conversation would help me learn more about the property and what you are hoping to accomplish. What is a good time to connect?\n\nThanks,\nLisa`;
+  if (type === "buyer-preapproval") {
+    return `${greeting}\n\nI would be happy to help you with this property and your search. If you are planning to tour or make an offer, the strongest next step is making sure your financing/pre-approval is current.\n\nIf you already have a lender, great. If not, I can point you toward a few good local options so you are ready when the right home comes along.\n\nWould you like to start with the property details or talk through financing first?\n\nThanks,\nLisa`;
   }
-  return `${greeting}\n\nThank you for your ${lead.source} inquiry${propertyLine}. I wanted to reach out quickly so I can help with the right next step.\n\nIf you are interested in a showing, more information, or talking through the buying process, let me know what works best for you.\n\nThanks,\nLisa`;
+  if (type === "seller-text") {
+    return `${greeting} this is Lisa Naples. ${sellerNeed} Are you looking for a quick value estimate, advice on timing, or a plan for getting the home ready?`;
+  }
+  if (type === "seller-email") {
+    return `${greeting}\n\nThank you for reaching out through ${lead.source}. ${sellerNeed}\n\nI can help you understand likely value, timing, preparation, and what the current market means for your specific home.\n\nA short conversation would help me give you better guidance. Are you thinking soon, later this year, or just exploring options?\n\nThanks,\nLisa`;
+  }
+  if (type === "seller-value") {
+    return `${greeting}\n\nThank you for reaching out. I would be glad to help you get a realistic sense of value.\n\nOnline estimates can be a starting point, but they usually miss condition, updates, setting, competition, and buyer demand. I can put together a more thoughtful range once I know a little more about the home and your timing.\n\nWould you prefer a quick call first, or would you like to send me a few details about the property?\n\nThanks,\nLisa`;
+  }
+  if (type === "seller-prep") {
+    return `${greeting}\n\nIf you are thinking about selling, one of the most useful things we can do early is talk through preparation: what is worth doing, what is not worth doing, timing, photos, staging, and how to launch well.\n\nI would be happy to walk through that with you before you spend time or money on projects.\n\nWhat does your ideal timing look like?\n\nThanks,\nLisa`;
+  }
+  if (type === "still-interested") {
+    return `${greeting}\n\nI wanted to check back in on your ${lead.source} inquiry${propertyLine}. Are you still interested, or has your search changed direction?\n\nEither way is completely fine. I just do not want to miss helping you if this is still on your radar.\n\nThanks,\nLisa`;
+  }
+  if (type === "no-pressure") {
+    return `${greeting}\n\nJust a quick, no-pressure follow-up. I know real estate timing can shift quickly, and sometimes an online inquiry is just the beginning of figuring things out.\n\nIf you would like help, I am happy to be a resource. If now is not the right time, that is okay too.\n\nThanks,\nLisa`;
+  }
+  return lead.type === "Seller" ? leadDraft("seller-email") : leadDraft("buyer-email");
 }
 
 function prepareEngagementDraft(type) {
@@ -1126,6 +1250,7 @@ function updateLeadStatus(leadId, status) {
   if (!lead) return;
   lead.status = status;
   const today = dateKey();
+  if (status === "noContact" && !lead.firstAttemptedAt) lead.firstAttemptedAt = today;
   if (status === "contacted" && !lead.firstContactedAt) lead.firstContactedAt = today;
   if (status === "appointment" && !lead.appointmentSetAt) lead.appointmentSetAt = today;
   addActivity(lead, `Status changed to ${statusLabel(status)}.`);
@@ -1140,10 +1265,12 @@ function updateResponseMilestone(leadId, response) {
   const today = dateKey();
   const updates = {
     attempted: ["firstAttemptedAt", "attempted", "First contact attempt logged."],
+    noContact: ["firstAttemptedAt", "noContact", "No contact made."],
     contacted: ["firstContactedAt", "contacted", "First contact made."],
     appointment: ["appointmentSetAt", "appointment", "Appointment set."],
     consultation: ["consultationCompletedAt", "consultation", "Consultation completed."],
     converted: ["convertedAt", "converted", "Lead converted to client."],
+    doNotContact: ["lostAt", "doNotContact", "Lead archived as do not contact."],
     lost: ["lostAt", "lost", "Lead marked lost."],
   };
   const update = updates[response];
@@ -1210,7 +1337,7 @@ function saveTeamMember(form, options = {}) {
   renderAll();
   if (options.toast) showToast(existing ? "Team member updated." : "Team member added.");
   if (options.promptInvite && !existing && member.email) {
-    const wantsInvite = window.confirm(`Invite ${member.name} to Lead Router now?`);
+    const wantsInvite = window.confirm(`Invite ${member.name} to Lead Relay now?`);
     if (wantsInvite) sendTeamInvite(member.id);
   }
   return member;
@@ -1231,7 +1358,7 @@ function scheduleTeamFormAutoSave() {
 }
 
 function leadRouterAppUrl() {
-  if (location.protocol === "file:") return "[paste your deployed Lead Router Vercel link here]";
+  if (location.protocol === "file:") return "[paste your deployed Lead Relay Vercel link here]";
   return location.origin + location.pathname;
 }
 
@@ -1239,7 +1366,7 @@ function teamInviteBody(member) {
   const accessLine = fullAccessFor(member)
     ? "You will have full-access assistant/admin access, which means you can see the full team lead workspace."
     : "You will have team-member access, which means you can see unclaimed leads and the leads you claim.";
-  return `Hi ${member.name},\n\nI am inviting you to Lead Router, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone in Safari:\n${leadRouterAppUrl()}\n\n2. Create an account using this email address:\n${member.email}\n\n3. After signing in, choose yourself under Working as if it is not already selected.\n\n4. Tap Share in Safari, then Add to Home Screen so Lead Router works like an app.\n\n5. Open the app from the Home Screen and tap Enable push alerts so you can receive lead notifications.\n\nOnce a lead comes in, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
+  return `Hi ${member.name},\n\nI am inviting you to Lead Relay, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone in Safari:\n${leadRouterAppUrl()}\n\n2. Create an account using this email address:\n${member.email}\n\n3. After signing in, choose yourself under Working as if it is not already selected.\n\n4. Tap Share in Safari, then Add to Home Screen so Lead Relay works like an app.\n\n5. Open the app from the Home Screen and tap Enable push alerts so you can receive lead notifications.\n\nOnce a lead comes in, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
 }
 
 function sendTeamInvite(memberId) {
@@ -1252,7 +1379,7 @@ function sendTeamInvite(memberId) {
   member.inviteStatus = "Invited";
   saveAndSync({ immediate: true });
   renderAll();
-  const subject = encodeURIComponent("Lead Router app invitation");
+  const subject = encodeURIComponent("Lead Relay app invitation");
   const body = encodeURIComponent(teamInviteBody(member));
   window.location.href = `mailto:${encodeURIComponent(member.email)}?subject=${subject}&body=${body}`;
   showToast(`Invite prepared for ${member.name}.`);
@@ -1447,7 +1574,7 @@ function importData(file) {
       settings = data.settings || settings;
       saveAndSync({ silent: false });
       renderAll();
-      showToast("Lead router data imported.");
+      showToast("Lead Relay data imported.");
     } catch {
       showToast("That import file could not be read.");
     }
@@ -1511,6 +1638,7 @@ function normalizeLeadStatus(value) {
   const normalized = String(value || "").toLowerCase();
   const compact = normalized.replace(/[^a-z0-9]+/g, "");
   if (normalized.includes("do not contact") || compact.includes("donotcontact") || normalized.includes("dnc")) return "doNotContact";
+  if (normalized.includes("no contact") || compact.includes("nocontact")) return "noContact";
   if (normalized.includes("converted") || normalized.includes("client")) return "converted";
   if (normalized.includes("consult")) return "consultation";
   if (normalized.includes("appointment")) return "appointment";
@@ -1649,6 +1777,25 @@ function downloadWeeklyReport() {
       statusLabel(lead.status),
       lead.nextFollowUpDate,
       lead.checkInStatus,
+      lead.message,
+    ]),
+  ]);
+}
+
+function downloadLeadPerformanceReport() {
+  const scope = reportScope();
+  downloadCsv(`lead-performance-${reportRange}.csv`, [
+    ["Name", "Owner", "Source", "Status", "Created", "Contact Outcome", "Phone", "Email", "Property", "Message"],
+    ...scope.map((lead) => [
+      lead.name,
+      lead.assignedTo || "Unassigned",
+      lead.source,
+      statusLabel(lead.status),
+      lead.createdAt ? dateOnlyLabel(lead.createdAt.slice(0, 10)) : "",
+      lead.status === "doNotContact" ? "Requested no contact / archived" : madeContact(lead) ? "Made contact" : lead.status === "noContact" ? "No contact made" : "Not worked yet",
+      lead.phone,
+      lead.email,
+      lead.property,
       lead.message,
     ]),
   ]);
@@ -1796,8 +1943,12 @@ document.querySelector("#workflowOwnerSelect").addEventListener("change", (event
   workflowOwner = event.target.value;
   renderWorkflow();
 });
+document.querySelector("#reportRangeSelect").addEventListener("change", (event) => {
+  reportRange = event.target.value;
+  renderReports();
+});
 document.querySelector("#downloadMyLeads").addEventListener("click", () => downloadOwnerLeads(myOwner));
-document.querySelector("#downloadReportButton").addEventListener("click", downloadWeeklyReport);
+document.querySelector("#downloadReportButton").addEventListener("click", downloadLeadPerformanceReport);
 document.querySelector("#downloadWorkflowOwner").addEventListener("click", () => downloadOwnerLeads(workflowOwner));
 document.querySelector("#downloadOwnerButton").addEventListener("click", () => downloadOwnerLeads(document.querySelector("#downloadOwnerSelect").value));
 document.querySelector("#exportButton").addEventListener("click", exportData);
