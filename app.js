@@ -478,7 +478,7 @@ function showToast(message) {
   const toast = document.querySelector("#toast");
   toast.textContent = message;
   toast.classList.add("visible");
-  window.setTimeout(() => toast.classList.remove("visible"), 2800);
+  window.setTimeout(() => toast.classList.remove("visible"), 5200);
 }
 
 function urlBase64ToUint8Array(value) {
@@ -507,6 +507,10 @@ async function enablePushAlerts() {
       showToast("Push is not turned on in Vercel yet.");
       return;
     }
+    if (!config.cloudSaveEnabled) {
+      showToast("Push cannot save yet. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel, then redeploy.");
+      return;
+    }
     const permission = await Notification.requestPermission();
     if (permission !== "granted") {
       showToast("Push permission was not approved.");
@@ -521,7 +525,7 @@ async function enablePushAlerts() {
     });
     await appApiRequest("/api/push-subscription", {
       method: "POST",
-      body: JSON.stringify({ owner: myOwner, subscription }),
+      body: JSON.stringify({ owner: myOwner, subscription: subscription.toJSON() }),
     });
     showToast(`Push alerts enabled for ${myOwner}. Now send a test push.`);
   } catch (error) {
