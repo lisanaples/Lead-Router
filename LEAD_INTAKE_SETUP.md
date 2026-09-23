@@ -30,7 +30,7 @@ Add these:
 
 | Name | What it is |
 | --- | --- |
-| `SUPABASE_URL` | Your Lead Router Supabase project URL |
+| `SUPABASE_URL` | Your Lead Router Supabase project URL, such as `https://your-project.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Your Supabase service role key, not the public key |
 | `LEAD_ROUTER_APP_URL` | Your app link, such as `https://lead-router-29yb.vercel.app` |
 | `LEAD_ROUTER_INTAKE_SECRET` | A private password you make up for incoming lead webhooks |

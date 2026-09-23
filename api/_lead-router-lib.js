@@ -11,6 +11,13 @@ function optionalEnv(name) {
   return process.env[name] || "";
 }
 
+function supabaseBaseUrl() {
+  return requiredEnv("SUPABASE_URL")
+    .trim()
+    .replace(/\/rest\/v1\/?$/i, "")
+    .replace(/\/+$/, "");
+}
+
 function setCors(response) {
   response.setHeader("Access-Control-Allow-Origin", "*");
   response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
@@ -145,17 +152,22 @@ function leadFromPayload(payload) {
 }
 
 async function supabaseRequest(path, options = {}) {
-  const url = requiredEnv("SUPABASE_URL");
+  const url = supabaseBaseUrl();
   const serviceKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-  const response = await fetch(`${url}${path}`, {
-    ...options,
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${serviceKey}`,
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${url}${path}`, {
+      ...options,
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error("Vercel could not reach Supabase. Check SUPABASE_URL in Vercel and redeploy.");
+  }
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.message || data?.msg || text || "Supabase request failed");
@@ -164,14 +176,19 @@ async function supabaseRequest(path, options = {}) {
 
 async function verifyUserToken(token) {
   if (!token) throw new Error("Sign in before creating a notified lead.");
-  const url = requiredEnv("SUPABASE_URL");
+  const url = supabaseBaseUrl();
   const serviceKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
-  const response = await fetch(`${url}/auth/v1/user`, {
-    headers: {
-      apikey: serviceKey,
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${url}/auth/v1/user`, {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    throw new Error("Vercel could not reach Supabase. Check SUPABASE_URL in Vercel and redeploy.");
+  }
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.message || "Sign in again before creating a notified lead.");
