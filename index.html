@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Lead Router Prototype</title>
-    <meta name="theme-color" content="#071b3f" />
+    <meta name="theme-color" content="#123849" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=24" />
+    <link rel="stylesheet" href="styles.css?v=26" />
   </head>
   <body>
     <main class="app-shell">
@@ -37,9 +37,12 @@
 
       <section class="main">
         <header class="topbar">
-          <div>
-            <span class="eyebrow">Lead response</span>
-            <h1>Claim the right lead fast</h1>
+          <div class="topbar-title">
+            <img class="dashboard-logo" src="assets/lead-router-icon.svg" alt="" />
+            <div>
+              <span class="eyebrow">Lead response</span>
+              <h1>Claim the right lead fast</h1>
+            </div>
           </div>
           <div class="topbar-actions">
             <button class="ghost-button" type="button" id="exportButton">Export</button>
@@ -78,9 +81,6 @@
           </form>
           <div class="sync-actions">
             <button class="ghost-button" type="button" id="refreshCloudButton">Refresh cloud data</button>
-            <button class="primary-button" type="button" id="uploadCloudButton">Save to cloud now</button>
-            <button class="ghost-button" type="button" id="enablePushButton">Enable push alerts</button>
-            <button class="ghost-button" type="button" id="testPushButton">Send test push</button>
             <button class="ghost-button" type="button" id="signOutButton">Sign out</button>
           </div>
         </section>
@@ -111,15 +111,6 @@
             </article>
           </section>
 
-          <section class="panel">
-            <div class="panel-header">
-              <div>
-                <span class="eyebrow">Activity</span>
-                <h2>Lead Timeline</h2>
-              </div>
-            </div>
-            <div class="activity-log" id="activityLog"></div>
-          </section>
         </section>
 
         <section class="view" id="myLeadsView">
@@ -309,6 +300,14 @@
               <label><input id="allowReclaim" type="checkbox" /> Allow admin to reassign claimed leads</label>
               <label><input id="notifyAll" type="checkbox" checked /> Notify all active team members</label>
             </div>
+            <div class="settings-card">
+              <strong>Device alerts</strong>
+              <p>Use these once on each phone or computer that should receive push notifications.</p>
+              <div class="setup-actions">
+                <button class="ghost-button small-button" type="button" id="enablePushButton">Enable push alerts</button>
+                <button class="ghost-button small-button" type="button" id="testPushButton">Send test push</button>
+              </div>
+            </div>
           </section>
         </section>
       </section>
@@ -380,9 +379,26 @@
           <label>Lost reason / conversion notes <input name="outcomeNotes" placeholder="Not ready, bought with another agent, converted, etc." /></label>
         </section>
         <label>Message <textarea name="message" placeholder="Original message or notes..."></textarea></label>
+        <section class="tracking-section engagement-section">
+          <div class="section-title">
+            <h3>Engagement drafts</h3>
+            <span>Email / text starters</span>
+          </div>
+          <div class="button-row">
+            <button class="ghost-button" type="button" data-draft-type="first-response">First response</button>
+            <button class="ghost-button" type="button" data-draft-type="showing">Showing follow-up</button>
+            <button class="ghost-button" type="button" data-draft-type="seller">Seller inquiry</button>
+            <button class="ghost-button" type="button" data-draft-type="text">Quick text</button>
+          </div>
+          <textarea id="engagementDraft" readonly placeholder="Choose a draft to prepare a message for this lead."></textarea>
+          <div class="button-row">
+            <button class="ghost-button" type="button" id="copyDraftButton">Copy draft</button>
+            <button class="ghost-button" type="button" id="openEmailDraftButton">Open email</button>
+          </div>
+        </section>
         <div class="dialog-actions">
           <button class="danger-button hidden" type="button" id="deleteLeadButton">Delete lead</button>
-          <button class="primary-button" type="submit">Save lead</button>
+          <button class="primary-button" type="button" data-close-dialog>Done</button>
         </div>
       </form>
     </dialog>
@@ -423,12 +439,12 @@
             </select>
           </label>
         </div>
-        <button class="primary-button" type="submit">Save team member</button>
+        <button class="primary-button" type="button" data-close-dialog>Done</button>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=26"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

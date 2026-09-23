@@ -4,8 +4,8 @@
   "description": "A first-to-claim real estate lead routing prototype.",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#071b3f",
-  "theme_color": "#071b3f",
+  "background_color": "#123849",
+  "theme_color": "#123849",
   "icons": [
     {
       "src": "assets/lead-router-icon.svg",

@@ -4,12 +4,12 @@
   --line: #dce2f2;
   --surface: #ffffff;
   --surface-soft: #f4f7ff;
-  --teal: #2563eb;
-  --teal-dark: #071b3f;
+  --teal: #123849;
+  --teal-dark: #123849;
   --gold: #d9a441;
   --rose: #e5487b;
   --sage: #20bfd4;
-  --shadow: 0 18px 48px rgba(36, 52, 166, 0.14);
+  --shadow: 0 18px 48px rgba(18, 56, 73, 0.14);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -20,9 +20,9 @@
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(32, 191, 212, 0.18), transparent 34%),
-    linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(154, 222, 73, 0.12)),
-    #f5f7ff;
+    radial-gradient(circle at top left, rgba(217, 164, 65, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(18, 56, 73, 0.08), rgba(217, 164, 65, 0.09)),
+    #f5f8f8;
   color: var(--ink);
 }
 
@@ -48,7 +48,7 @@ button {
   flex-direction: column;
   gap: 22px;
   padding: 24px;
-  background: linear-gradient(180deg, #1d267f, #2532a3 58%, #16205c);
+  background: linear-gradient(180deg, #123849, #0d2d3c 58%, #092331);
   color: white;
 }
 
@@ -95,7 +95,7 @@ button {
 .nav-item.active,
 .nav-item:hover {
   background: white;
-  color: #071b3f;
+  color: #123849;
 }
 
 .sidebar-panel {
@@ -139,6 +139,25 @@ button {
 
 .topbar {
   margin-bottom: 22px;
+}
+
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.dashboard-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 14px 30px rgba(18, 56, 73, 0.2);
+}
+
+.topbar h1 {
+  color: var(--teal-dark);
 }
 
 .topbar-actions {
@@ -195,7 +214,8 @@ button {
 .sync-actions {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
+  justify-content: start;
   width: 100%;
 }
 
@@ -266,7 +286,7 @@ p {
   border: 0;
   background: var(--teal);
   color: white;
-  box-shadow: 0 10px 24px rgba(15, 118, 110, 0.2);
+  box-shadow: 0 10px 24px rgba(18, 56, 73, 0.2);
 }
 
 .ghost-button,
@@ -359,12 +379,19 @@ p {
 
 .lead-card {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   border: 1px solid var(--line);
   border-left: 5px solid var(--gold);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px 9px;
   background: var(--surface);
+  cursor: pointer;
+  transition: 140ms ease;
+}
+
+.lead-card:hover {
+  border-color: rgba(15, 61, 78, 0.28);
+  box-shadow: 0 10px 22px rgba(7, 27, 63, 0.08);
 }
 
 .lead-card.hot {
@@ -388,7 +415,17 @@ p {
 .lead-main strong {
   display: block;
   overflow: hidden;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-main span {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -428,8 +465,19 @@ p {
 }
 
 .compact .lead-card {
-  gap: 5px;
-  padding: 8px;
+  gap: 4px;
+  min-height: 58px;
+  padding: 7px 8px;
+}
+
+.compact .lead-actions {
+  margin-top: 1px;
+}
+
+.compact .lead-actions .primary-button {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 0.7rem;
 }
 
 .section-title {
@@ -648,6 +696,12 @@ p {
   white-space: pre-wrap;
 }
 
+.engagement-section textarea {
+  min-height: 150px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
 textarea,
 input,
 select {
@@ -698,6 +752,18 @@ textarea {
 .settings-card input[type="checkbox"] {
   width: 18px;
   min-height: 18px;
+}
+
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.small-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.78rem;
 }
 
 dialog {
@@ -761,7 +827,7 @@ label {
   opacity: 0;
   border-radius: 8px;
   padding: 12px 14px;
-  background: #071b3f;
+  background: #123849;
   color: white;
   font-weight: 850;
   transition: 160ms ease;

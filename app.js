@@ -89,6 +89,8 @@ let accountRole = localStorage.getItem(ACCOUNT_ROLE_KEY) || "master";
 let cloudSession = loadCloudSession();
 let parsedLeadDraft = null;
 let autoSyncTimer = null;
+let leadFormAutoSaveTimer = null;
+let teamFormAutoSaveTimer = null;
 let syncState = "idle";
 let lastAutoSync = localStorage.getItem(LAST_AUTO_SYNC_KEY) || "";
 
@@ -581,37 +583,32 @@ function addActivity(lead, text) {
 
 function leadCard(lead, compact = false) {
   const assigned = lead.assignedTo ? `Assigned to ${escapeHtml(lead.assignedTo)}` : "Available to claim";
-  const followUp = lead.nextFollowUpDate ? `Follow-up ${dateOnlyLabel(lead.nextFollowUpDate)}` : "No follow-up set";
   return `
     <article class="lead-card ${lead.urgency.toLowerCase()} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
       <div class="lead-main">
         <div>
           <strong>${escapeHtml(lead.name)}</strong>
-          <span>${escapeHtml(lead.property || "No property yet")}</span>
+          <span>${escapeHtml(lead.source || "Lead")}${lead.property ? ` - ${escapeHtml(lead.property)}` : ""}</span>
         </div>
         <span class="status-pill">${statusLabel(lead.status)}</span>
       </div>
-      <div class="lead-meta">
-        <span>${escapeHtml(lead.source)}</span>
-        <span>${escapeHtml(lead.type)}</span>
-        <span>${escapeHtml(lead.urgency)}</span>
-        <span>${leadAge(lead.createdAt)}</span>
-        <span>${assigned}</span>
-        <span>${followUp}</span>
-        <span>${latestResponseLabel(lead)}</span>
-      </div>
-      ${compact ? "" : `<p>${escapeHtml(lead.message || "No message yet.")}</p>`}
+      ${compact ? "" : `
+        <div class="lead-meta">
+          <span>${escapeHtml(lead.type)}</span>
+          <span>${escapeHtml(lead.urgency)}</span>
+          <span>${leadAge(lead.createdAt)}</span>
+          <span>${assigned}</span>
+          ${lead.nextFollowUpDate ? `<span>Follow-up ${dateOnlyLabel(lead.nextFollowUpDate)}</span>` : ""}
+        </div>
+      `}
       <div class="lead-actions">
         ${lead.status === "new" ? claimButtons(lead) : ""}
-        <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Edit</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
-        <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="contacted">Contacted</button>
-        <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="appointment">Appointment</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="consultation">Consultation</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="converted">Converted</button>
-        <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="nurture">Nurture</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="lost">Lost</button>
-        <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
+        ${compact ? "" : `
+          <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
+          <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="contacted">Contacted</button>
+          <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="appointment">Appointment</button>
+          <button class="ghost-button" type="button" data-status-lead="${lead.id}" data-status="nurture">Nurture</button>
+        `}
       </div>
     </article>
   `;
@@ -661,23 +658,8 @@ function renderDashboard() {
   const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact"].includes(lead.status)).sort(sortNewest);
   document.querySelector("#unclaimedCount").textContent = unclaimed.length;
   document.querySelector("#claimedCount").textContent = claimed.length;
-  document.querySelector("#unclaimedLeads").innerHTML = unclaimed.length ? unclaimed.map((lead) => leadCard(lead)).join("") : emptyState("No unclaimed leads.");
+  document.querySelector("#unclaimedLeads").innerHTML = unclaimed.length ? unclaimed.map((lead) => leadCard(lead, true)).join("") : emptyState("No unclaimed leads.");
   document.querySelector("#claimedLeads").innerHTML = claimed.length ? claimed.map((lead) => leadCard(lead, true)).join("") : emptyState("No claimed leads yet.");
-  renderActivityLog();
-}
-
-function renderActivityLog() {
-  const rows = visibleLeads()
-    .flatMap((lead) => (lead.activity || []).map((activity) => ({ ...activity, lead })))
-    .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 12);
-  document.querySelector("#activityLog").innerHTML = rows.length ? rows.map((row) => `
-    <div class="activity-row">
-      <strong>${escapeHtml(row.lead.name)}</strong>
-      <span>${dateTimeLabel(row.at)}</span>
-      <p>${escapeHtml(row.text)}</p>
-    </div>
-  `).join("") : emptyState("No activity yet.");
 }
 
 function sortNewest(a, b) {
@@ -936,7 +918,6 @@ function renderSyncStatus() {
   document.querySelector("#authForm").classList.toggle("hidden", signedIn);
   document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn);
   document.querySelector("#refreshCloudButton").disabled = !signedIn;
-  document.querySelector("#uploadCloudButton").disabled = !signedIn;
   document.querySelector("#enablePushButton").disabled = !pushAvailable || !myOwner;
   document.querySelector("#testPushButton").disabled = !pushAvailable || !myOwner;
 }
@@ -966,6 +947,7 @@ function switchView(view) {
 }
 
 function fillLeadForm(lead = {}) {
+  window.clearTimeout(leadFormAutoSaveTimer);
   const form = document.querySelector("#leadForm");
   form.elements.assignedTo.innerHTML = ownerOptions(lead.assignedTo || "", true);
   form.elements.leadId.value = lead.id || "";
@@ -988,9 +970,11 @@ function fillLeadForm(lead = {}) {
   form.elements.lostAt.value = lead.lostAt || "";
   form.elements.outcomeNotes.value = lead.outcomeNotes || "";
   form.elements.message.value = lead.message || "";
+  document.querySelector("#engagementDraft").value = "";
 }
 
 function openLeadDialog(lead) {
+  window.clearTimeout(leadFormAutoSaveTimer);
   fillLeadForm(lead);
   document.querySelector("#leadDialogTitle").textContent = lead ? "Edit Lead" : "Add Lead";
   document.querySelector("#deleteLeadButton").classList.toggle("hidden", !lead);
@@ -998,15 +982,76 @@ function openLeadDialog(lead) {
   document.querySelector("#leadDialog").showModal();
 }
 
-function saveLead(form) {
+function currentLeadFromForm() {
+  const form = document.querySelector("#leadForm");
+  return {
+    source: form.elements.source.value.trim() || "your inquiry",
+    type: form.elements.type.value || "Buyer",
+    name: form.elements.name.value.trim() || "there",
+    phone: form.elements.phone.value.trim(),
+    email: form.elements.email.value.trim(),
+    property: form.elements.property.value.trim(),
+    price: form.elements.price.value.trim(),
+    message: form.elements.message.value.trim(),
+  };
+}
+
+function firstName(name) {
+  return String(name || "there").trim().split(/\s+/)[0] || "there";
+}
+
+function leadDraft(type) {
+  const lead = currentLeadFromForm();
+  const greeting = `Hi ${firstName(lead.name)},`;
+  const propertyLine = lead.property ? ` about ${lead.property}` : "";
+  if (type === "text") {
+    return `${greeting} this is Lisa Naples. I received your ${lead.source} inquiry${propertyLine} and wanted to reach out quickly. Are you available for a quick call or text conversation?`;
+  }
+  if (type === "showing") {
+    return `${greeting}\n\nThank you for reaching out${propertyLine}. I would be happy to help with details and next steps.\n\nAre there specific times that work best for you to see the property or talk through what you are looking for?\n\nThanks,\nLisa`;
+  }
+  if (type === "seller") {
+    return `${greeting}\n\nThank you for reaching out about selling. I would be happy to help you understand timing, value, preparation, and next steps.\n\nA quick conversation would help me learn more about the property and what you are hoping to accomplish. What is a good time to connect?\n\nThanks,\nLisa`;
+  }
+  return `${greeting}\n\nThank you for your ${lead.source} inquiry${propertyLine}. I wanted to reach out quickly so I can help with the right next step.\n\nIf you are interested in a showing, more information, or talking through the buying process, let me know what works best for you.\n\nThanks,\nLisa`;
+}
+
+function prepareEngagementDraft(type) {
+  document.querySelector("#engagementDraft").value = leadDraft(type);
+}
+
+async function copyEngagementDraft() {
+  const text = document.querySelector("#engagementDraft").value.trim();
+  if (!text) {
+    showToast("Choose a draft first.");
+    return;
+  }
+  await navigator.clipboard.writeText(text);
+  showToast("Draft copied.");
+}
+
+function openEmailDraft() {
+  const lead = currentLeadFromForm();
+  const body = document.querySelector("#engagementDraft").value.trim();
+  if (!body) {
+    showToast("Choose a draft first.");
+    return;
+  }
+  const subject = lead.property ? `Your inquiry about ${lead.property}` : "Your real estate inquiry";
+  window.location.href = `mailto:${encodeURIComponent(lead.email || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function saveLead(form, options = {}) {
   const data = new FormData(form);
   const existingId = Number(data.get("leadId"));
   const existing = leads.find((lead) => lead.id === existingId);
+  const hasDraftContent = ["source", "name", "phone", "email", "property", "price", "message"].some((key) => String(data.get(key) || "").trim());
+  if (!existing && !hasDraftContent) return null;
   const lead = {
     id: existing?.id || Date.now(),
-    source: String(data.get("source") || "").trim(),
+    source: String(data.get("source") || "").trim() || "Manual lead",
     type: String(data.get("type") || "Buyer"),
-    name: String(data.get("name") || "").trim(),
+    name: String(data.get("name") || "").trim() || "New lead",
     phone: String(data.get("phone") || "").trim(),
     email: String(data.get("email") || "").trim(),
     property: String(data.get("property") || "").trim(),
@@ -1029,17 +1074,21 @@ function saveLead(form) {
   };
   if (existing) {
     Object.assign(existing, lead);
-    addActivity(existing, "Lead details updated.");
+    if (options.activity !== false) addActivity(existing, "Lead details updated.");
   } else {
     lead.activity = [{ at: new Date().toISOString(), text: `Lead received from ${lead.source}.` }];
     leads.unshift(lead);
-    broadcastLead(lead);
+    if (options.broadcast) broadcastLead(lead);
+    form.elements.leadId.value = lead.id;
   }
-  saveAndSync();
-  form.reset();
-  document.querySelector("#leadDialog").close();
+  saveAndSync({ silent: options.silent !== false });
+  if (options.close) {
+    form.reset();
+    document.querySelector("#leadDialog").close();
+  }
   renderAll();
-  showToast(existing ? "Lead updated." : "Lead added and simulated notification sent.");
+  if (options.toast) showToast(existing ? "Lead updated." : "Lead added.");
+  return lead;
 }
 
 function deleteLead(leadId) {
@@ -1108,6 +1157,7 @@ function updateResponseMilestone(leadId, response) {
 }
 
 function fillTeamForm(member = {}) {
+  window.clearTimeout(teamFormAutoSaveTimer);
   const form = document.querySelector("#teamForm");
   form.elements.teamId.value = member.id || "";
   form.elements.name.value = member.name || "";
@@ -1119,19 +1169,22 @@ function fillTeamForm(member = {}) {
 }
 
 function openTeamDialog(member) {
+  window.clearTimeout(teamFormAutoSaveTimer);
   fillTeamForm(member);
   document.querySelector("#teamDialog h2").textContent = member ? "Edit Team Member" : "Add Team Member";
   document.querySelector("#teamDialog").showModal();
 }
 
-function saveTeamMember(form) {
+function saveTeamMember(form, options = {}) {
   const data = new FormData(form);
   const existingId = Number(data.get("teamId"));
   const existing = team.find((member) => member.id === existingId);
   const oldName = existing?.name;
+  const hasDraftContent = ["name", "phone", "email"].some((key) => String(data.get(key) || "").trim());
+  if (!existing && !hasDraftContent) return null;
   const member = {
     id: existing?.id || Date.now(),
-    name: String(data.get("name") || "").trim(),
+    name: String(data.get("name") || "").trim() || "New team member",
     phone: String(data.get("phone") || "").trim(),
     email: String(data.get("email") || "").trim(),
     accessRole: String(data.get("accessRole") || "Team member"),
@@ -1140,21 +1193,41 @@ function saveTeamMember(form) {
     claims: existing?.claims || 0,
   };
   if (existing) Object.assign(existing, member);
-  else team.push(member);
+  else {
+    team.push(member);
+    form.elements.teamId.value = member.id;
+  }
   if (oldName && oldName !== member.name) {
     leads.forEach((lead) => {
       if (lead.assignedTo === oldName) lead.assignedTo = member.name;
     });
   }
-  saveAndSync();
-  form.reset();
-  document.querySelector("#teamDialog").close();
+  saveAndSync({ silent: options.silent !== false });
+  if (options.close) {
+    form.reset();
+    document.querySelector("#teamDialog").close();
+  }
   renderAll();
-  showToast(existing ? "Team member updated." : "Team member added.");
-  if (!existing && member.email) {
+  if (options.toast) showToast(existing ? "Team member updated." : "Team member added.");
+  if (options.promptInvite && !existing && member.email) {
     const wantsInvite = window.confirm(`Invite ${member.name} to Lead Router now?`);
     if (wantsInvite) sendTeamInvite(member.id);
   }
+  return member;
+}
+
+function scheduleLeadFormAutoSave() {
+  window.clearTimeout(leadFormAutoSaveTimer);
+  leadFormAutoSaveTimer = window.setTimeout(() => {
+    saveLead(document.querySelector("#leadForm"), { activity: false, silent: true });
+  }, 650);
+}
+
+function scheduleTeamFormAutoSave() {
+  window.clearTimeout(teamFormAutoSaveTimer);
+  teamFormAutoSaveTimer = window.setTimeout(() => {
+    saveTeamMember(document.querySelector("#teamForm"), { silent: true });
+  }, 650);
 }
 
 function leadRouterAppUrl() {
@@ -1628,6 +1701,11 @@ document.addEventListener("click", (event) => {
   const editLead = event.target.closest("[data-edit-lead]");
   if (editLead) openLeadDialog(leads.find((lead) => lead.id === Number(editLead.dataset.editLead)));
 
+  const openLead = event.target.closest("[data-open-lead]");
+  if (openLead && !event.target.closest("button, a, input, select, textarea")) {
+    openLeadDialog(leads.find((lead) => lead.id === Number(openLead.dataset.openLead)));
+  }
+
   const deleteButton = event.target.closest("[data-delete-lead]");
   if (deleteButton) deleteLead(deleteButton.dataset.deleteLead);
 
@@ -1655,20 +1733,39 @@ document.addEventListener("click", (event) => {
   const followUpButton = event.target.closest("[data-followup-lead]");
   if (followUpButton) moveFollowUp(followUpButton.dataset.followupLead, followUpButton.dataset.days);
 
-  if (event.target.closest("[data-close-dialog]")) event.target.closest("dialog").close();
+  const draftButton = event.target.closest("[data-draft-type]");
+  if (draftButton) prepareEngagementDraft(draftButton.dataset.draftType);
+
+  const closeDialogButton = event.target.closest("[data-close-dialog]");
+  if (closeDialogButton) {
+    const dialog = closeDialogButton.closest("dialog");
+    if (dialog?.id === "leadDialog") {
+      window.clearTimeout(leadFormAutoSaveTimer);
+      saveLead(document.querySelector("#leadForm"), { activity: false, silent: true });
+    }
+    if (dialog?.id === "teamDialog") {
+      window.clearTimeout(teamFormAutoSaveTimer);
+      saveTeamMember(document.querySelector("#teamForm"), { silent: true });
+    }
+    dialog?.close();
+  }
 });
 
 document.querySelector("#openLeadForm").addEventListener("click", () => openLeadDialog());
 document.querySelector("#leadForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  saveLead(event.currentTarget);
 });
+document.querySelector("#leadForm").addEventListener("input", scheduleLeadFormAutoSave);
+document.querySelector("#leadForm").addEventListener("change", scheduleLeadFormAutoSave);
+document.querySelector("#copyDraftButton").addEventListener("click", copyEngagementDraft);
+document.querySelector("#openEmailDraftButton").addEventListener("click", openEmailDraft);
 
 document.querySelector("#addTeamMember").addEventListener("click", () => openTeamDialog());
 document.querySelector("#teamForm").addEventListener("submit", (event) => {
   event.preventDefault();
-  saveTeamMember(event.currentTarget);
 });
+document.querySelector("#teamForm").addEventListener("input", scheduleTeamFormAutoSave);
+document.querySelector("#teamForm").addEventListener("change", scheduleTeamFormAutoSave);
 
 document.querySelector("#parseEmailButton").addEventListener("click", createLeadFromEmail);
 document.querySelector("#createParsedLeadButton").addEventListener("click", createParsedLeadAndNotify);
@@ -1738,7 +1835,6 @@ document.querySelector("#createAccountButton").addEventListener("click", async (
   }
 });
 document.querySelector("#refreshCloudButton").addEventListener("click", () => refreshFromCloud());
-document.querySelector("#uploadCloudButton").addEventListener("click", () => syncCloudSnapshot());
 document.querySelector("#enablePushButton").addEventListener("click", enablePushAlerts);
 document.querySelector("#testPushButton").addEventListener("click", sendTestPush);
 document.querySelector("#signOutButton").addEventListener("click", () => {
