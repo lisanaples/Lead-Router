@@ -10,6 +10,7 @@ const SUPABASE_KEY = "sb_publishable_wvNqklMeEgNe21HquCDiWg_F22bTjMA";
 const CLOUD_RECORD_ID = "lead-router-shared-workspace";
 const TEAM_STATUSES = ["Available", "On call", "Backup only", "Paused", "Out of office", "Admin only"];
 const ROUTING_STATUSES = ["Available", "On call"];
+const FULL_ACCESS_ROLES = ["Full access"];
 const PIPELINE_GROUPS = [
   { key: "hot", label: "Hot" },
   { key: "warm", label: "Warm" },
@@ -63,9 +64,9 @@ const sampleLeads = [
 ];
 
 const sampleTeam = [
-  { id: 1, name: "Lisa", phone: "717-555-0101", email: "lisa@example.com", status: "Available", claims: 1 },
-  { id: 2, name: "Assistant", phone: "717-555-0102", email: "assistant@example.com", status: "Available", claims: 0 },
-  { id: 3, name: "Buyer Agent", phone: "717-555-0103", email: "buyeragent@example.com", status: "On call", claims: 0 },
+  { id: 1, name: "Lisa", phone: "717-555-0101", email: "lisa@example.com", status: "Available", accessRole: "Full access", inviteStatus: "Account created", claims: 1 },
+  { id: 2, name: "Assistant", phone: "717-555-0102", email: "assistant@example.com", status: "Available", accessRole: "Full access", inviteStatus: "Not invited", claims: 0 },
+  { id: 3, name: "Buyer Agent", phone: "717-555-0103", email: "buyeragent@example.com", status: "On call", accessRole: "Team member", inviteStatus: "Not invited", claims: 0 },
 ];
 
 const defaultSettings = {
@@ -93,6 +94,8 @@ let lastAutoSync = localStorage.getItem(LAST_AUTO_SYNC_KEY) || "";
 team = team.map((member) => ({
   ...member,
   status: member.status || (member.active === false ? "Paused" : "Available"),
+  accessRole: member.accessRole || (teamMemberStatus(member) === "Admin only" ? "Full access" : "Team member"),
+  inviteStatus: member.inviteStatus || "Not invited",
 }));
 leads = leads.map((lead) => ({
   ...lead,
@@ -152,6 +155,13 @@ function applySnapshot(snapshot) {
   leads = Array.isArray(snapshot.leads) ? snapshot.leads : leads;
   team = Array.isArray(snapshot.team) ? snapshot.team : team;
   settings = snapshot.settings || settings;
+  team = team.map((member) => ({
+    ...member,
+    status: member.status || (member.active === false ? "Paused" : "Available"),
+    accessRole: member.accessRole || (teamMemberStatus(member) === "Admin only" ? "Full access" : "Team member"),
+    inviteStatus: member.inviteStatus || "Not invited",
+  }));
+  applySignedInTeamAccess();
   saveAll();
   renderAll();
 }
@@ -202,6 +212,8 @@ async function signIn(email, password) {
   });
   saveCloudSession(data);
   await refreshFromCloud({ silent: true });
+  applySignedInTeamAccess();
+  renderAll();
   showToast("Signed in and refreshed cloud data.");
 }
 
@@ -341,8 +353,49 @@ function statusLabel(status) {
   return labels[status] || status;
 }
 
+function normalizedEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function jwtPayload(token) {
+  try {
+    const payload = String(token || "").split(".")[1];
+    if (!payload) return {};
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return JSON.parse(atob(padded));
+  } catch {
+    return {};
+  }
+}
+
+function signedInEmail() {
+  return normalizedEmail(cloudSession?.user?.email || jwtPayload(cloudSession?.access_token).email);
+}
+
+function teamMemberForEmail(email = signedInEmail()) {
+  const target = normalizedEmail(email);
+  if (!target) return null;
+  return team.find((member) => normalizedEmail(member.email) === target) || null;
+}
+
+function fullAccessFor(member) {
+  return member && (FULL_ACCESS_ROLES.includes(member.accessRole) || teamMemberStatus(member) === "Admin only");
+}
+
+function applySignedInTeamAccess() {
+  const member = teamMemberForEmail();
+  if (!member) return;
+  myOwner = member.name;
+  localStorage.setItem(MY_OWNER_KEY, myOwner);
+  accountRole = fullAccessFor(member) ? "master" : "team";
+  localStorage.setItem(ACCOUNT_ROLE_KEY, accountRole);
+}
+
 function visibleLeads() {
-  if (accountRole === "team") return leads.filter((lead) => lead.assignedTo === myOwner);
+  if (accountRole === "team") {
+    return leads.filter((lead) => lead.status === "new" || lead.assignedTo === myOwner);
+  }
   return leads;
 }
 
@@ -351,7 +404,9 @@ function canManageAll() {
 }
 
 function applyAccountAccess() {
+  if (cloudSession?.access_token) applySignedInTeamAccess();
   document.querySelector("#accountRoleSelect").value = accountRole;
+  document.querySelector("#accountRoleSelect").disabled = Boolean(teamMemberForEmail());
   document.querySelectorAll(".master-only").forEach((element) => {
     element.classList.toggle("hidden", !canManageAll());
   });
@@ -533,7 +588,10 @@ function leadCard(lead, compact = false) {
 }
 
 function claimButtons(lead) {
-  if (!canManageAll()) return "";
+  if (!canManageAll()) {
+    const member = team.find((entry) => entry.name === myOwner);
+    return member ? `<button class="primary-button" type="button" data-claim-lead="${lead.id}" data-member="${member.id}">Claim lead</button>` : "";
+  }
   const members = activeTeam();
   if (!members.length) return `<button class="ghost-button" type="button" disabled>No active agents</button>`;
   return members.map((member) => `
@@ -631,8 +689,11 @@ function renderTeam() {
       <span>${escapeHtml(member.phone || "No phone")}</span>
       <span>${escapeHtml(member.email || "No email")}</span>
       <span>${escapeHtml(teamMemberStatus(member))}</span>
+      <span>${escapeHtml(member.accessRole || "Team member")}</span>
+      <span>${escapeHtml(member.inviteStatus || "Not invited")}</span>
       <div class="lead-actions">
         <button class="ghost-button" type="button" data-edit-team="${member.id}">Edit</button>
+        <button class="ghost-button" type="button" data-invite-team="${member.id}">Invite</button>
         <button class="ghost-button" type="button" data-download-owner="${escapeHtml(member.name)}">Download leads</button>
       </div>
     </article>
@@ -1022,7 +1083,9 @@ function fillTeamForm(member = {}) {
   form.elements.name.value = member.name || "";
   form.elements.phone.value = member.phone || "";
   form.elements.email.value = member.email || "";
+  form.elements.accessRole.value = member.accessRole || "Team member";
   form.elements.status.innerHTML = teamStatusOptions(teamMemberStatus(member));
+  form.elements.inviteStatus.value = member.inviteStatus || "Not invited";
 }
 
 function openTeamDialog(member) {
@@ -1041,7 +1104,9 @@ function saveTeamMember(form) {
     name: String(data.get("name") || "").trim(),
     phone: String(data.get("phone") || "").trim(),
     email: String(data.get("email") || "").trim(),
+    accessRole: String(data.get("accessRole") || "Team member"),
     status: String(data.get("status") || "Available"),
+    inviteStatus: String(data.get("inviteStatus") || "Not invited"),
     claims: existing?.claims || 0,
   };
   if (existing) Object.assign(existing, member);
@@ -1056,6 +1121,38 @@ function saveTeamMember(form) {
   document.querySelector("#teamDialog").close();
   renderAll();
   showToast(existing ? "Team member updated." : "Team member added.");
+  if (!existing && member.email) {
+    const wantsInvite = window.confirm(`Invite ${member.name} to Lead Router now?`);
+    if (wantsInvite) sendTeamInvite(member.id);
+  }
+}
+
+function leadRouterAppUrl() {
+  if (location.protocol === "file:") return "[paste your deployed Lead Router Vercel link here]";
+  return location.origin + location.pathname;
+}
+
+function teamInviteBody(member) {
+  const accessLine = fullAccessFor(member)
+    ? "You will have full-access assistant/admin access, which means you can see the full team lead workspace."
+    : "You will have team-member access, which means you can see unclaimed leads and the leads you claim.";
+  return `Hi ${member.name},\n\nI am inviting you to Lead Router, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone in Safari:\n${leadRouterAppUrl()}\n\n2. Create an account using this email address:\n${member.email}\n\n3. After signing in, choose yourself under Working as if it is not already selected.\n\n4. Tap Share in Safari, then Add to Home Screen so Lead Router works like an app.\n\n5. Open the app from the Home Screen and tap Enable push alerts so you can receive lead notifications.\n\nOnce a lead comes in, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
+}
+
+function sendTeamInvite(memberId) {
+  const member = team.find((entry) => entry.id === Number(memberId));
+  if (!member) return;
+  if (!member.email) {
+    showToast("Add an email before sending an invite.");
+    return;
+  }
+  member.inviteStatus = "Invited";
+  saveAndSync({ immediate: true });
+  renderAll();
+  const subject = encodeURIComponent("Lead Router app invitation");
+  const body = encodeURIComponent(teamInviteBody(member));
+  window.location.href = `mailto:${encodeURIComponent(member.email)}?subject=${subject}&body=${body}`;
+  showToast(`Invite prepared for ${member.name}.`);
 }
 
 function toggleTeamMember(id) {
@@ -1482,6 +1579,9 @@ document.addEventListener("click", (event) => {
 
   const editTeam = event.target.closest("[data-edit-team]");
   if (editTeam) openTeamDialog(team.find((member) => member.id === Number(editTeam.dataset.editTeam)));
+
+  const inviteTeam = event.target.closest("[data-invite-team]");
+  if (inviteTeam) sendTeamInvite(inviteTeam.dataset.inviteTeam);
 
   const ownerDownload = event.target.closest("[data-download-owner]");
   if (ownerDownload) downloadOwnerLeads(ownerDownload.dataset.downloadOwner);

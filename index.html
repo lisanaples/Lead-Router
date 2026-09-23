@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=15" />
+    <link rel="stylesheet" href="styles.css?v=16" />
   </head>
   <body>
     <main class="app-shell">
@@ -399,6 +399,12 @@
           <label>Name <input name="name" required placeholder="Agent name" /></label>
           <label>Cell phone <input name="phone" placeholder="Text number" /></label>
           <label>Email <input name="email" type="email" placeholder="Email" /></label>
+          <label>App access
+            <select name="accessRole">
+              <option>Team member</option>
+              <option>Full access</option>
+            </select>
+          </label>
           <label>Status
             <select name="status">
               <option>Available</option>
@@ -409,13 +415,20 @@
               <option>Admin only</option>
             </select>
           </label>
+          <label>Invite status
+            <select name="inviteStatus">
+              <option>Not invited</option>
+              <option>Invited</option>
+              <option>Account created</option>
+            </select>
+          </label>
         </div>
         <button class="primary-button" type="submit">Save team member</button>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");
