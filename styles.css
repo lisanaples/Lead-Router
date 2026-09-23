@@ -5,8 +5,8 @@
   --surface: #ffffff;
   --surface-soft: #f4f7ff;
   --teal: #2563eb;
-  --teal-dark: #2434a6;
-  --gold: #9ade49;
+  --teal-dark: #071b3f;
+  --gold: #d9a441;
   --rose: #e5487b;
   --sage: #20bfd4;
   --shadow: 0 18px 48px rgba(36, 52, 166, 0.14);
@@ -59,14 +59,10 @@ button {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
   width: 48px;
   height: 48px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #9ade49, #28d6ed);
-  color: #161f55;
-  font-weight: 950;
+  object-fit: cover;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
 }
 
@@ -99,7 +95,7 @@ button {
 .nav-item.active,
 .nav-item:hover {
   background: white;
-  color: #2434a6;
+  color: #071b3f;
 }
 
 .sidebar-panel {
@@ -737,7 +733,7 @@ label {
   opacity: 0;
   border-radius: 8px;
   padding: 12px 14px;
-  background: #2434a6;
+  background: #071b3f;
   color: white;
   font-weight: 850;
   transition: 160ms ease;
