@@ -104,6 +104,7 @@ team = team.map((member) => ({
 }));
 leads = leads.map((lead) => ({
   ...lead,
+  notes: Array.isArray(lead.notes) ? lead.notes : [],
   nextFollowUpDate: lead.nextFollowUpDate || "",
   firstAttemptedAt: lead.firstAttemptedAt || "",
   firstContactedAt: lead.firstContactedAt || "",
@@ -903,6 +904,61 @@ function statRows(title, totals) {
   `;
 }
 
+function chartColor(index) {
+  return ["#123849", "#d9a441", "#20bfd4", "#e5487b", "#6c7a89", "#7fb069", "#9a6dd7", "#f28c38"][index % 8];
+}
+
+function donutChart(title, totals) {
+  const entries = Object.entries(totals).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
+  const total = entries.reduce((sum, [, value]) => sum + value, 0);
+  let cursor = 0;
+  const segments = entries.map(([, value], index) => {
+    const start = cursor;
+    const size = total ? (value / total) * 100 : 0;
+    cursor += size;
+    return `${chartColor(index)} ${start}% ${cursor}%`;
+  }).join(", ");
+  return `
+    <article class="report-card chart-card">
+      <h3>${title}</h3>
+      ${total ? `
+        <div class="donut-wrap">
+          <div class="donut-chart" style="background: conic-gradient(${segments});">
+            <span>${total}</span>
+          </div>
+          <div class="chart-legend">
+            ${entries.map(([label, value], index) => `
+              <div class="legend-row">
+                <i style="background:${chartColor(index)}"></i>
+                <span>${escapeHtml(label)}</span>
+                <strong>${value}</strong>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      ` : `<div class="empty-state">No chart data</div>`}
+    </article>
+  `;
+}
+
+function barChart(title, rows, valueKey = "total") {
+  const max = Math.max(1, ...rows.map((row) => row[valueKey] || 0));
+  return `
+    <article class="report-card wide-report-card">
+      <h3>${title}</h3>
+      ${rows.length ? rows.map((row, index) => `
+        <div class="bar-row">
+          <span>${escapeHtml(row.owner || row.label)}</span>
+          <div class="bar-track">
+            <i style="width:${Math.max(4, ((row[valueKey] || 0) / max) * 100)}%; background:${chartColor(index)}"></i>
+          </div>
+          <strong>${row[valueKey] || 0}</strong>
+        </div>
+      `).join("") : `<div class="empty-state">No chart data</div>`}
+    </article>
+  `;
+}
+
 function percentLabel(value, total) {
   if (!total) return "0%";
   return `${Math.round((value / total) * 100)}%`;
@@ -964,7 +1020,16 @@ function renderReports() {
     metricCard("Active funnel", active.length, "Open leads"),
     metricCard("Due follow-ups", weekly.length, `${overdue} overdue · ${noDate} no date`),
   ].join("");
+  const ownerRows = ownerPerformanceRows(scope);
   document.querySelector("#leadPerformanceReport").innerHTML = [
+    donutChart("Lead source mix", countBy(scope, (lead) => lead.source || "Unknown source")),
+    donutChart("Contact outcome mix", {
+      "Made contact": contacted,
+      "No contact made": noContact,
+      "Archived DNC": archived,
+      "Not worked yet": scope.filter((lead) => ["new", "claimed"].includes(lead.status)).length,
+    }),
+    barChart(canManageAll() ? "Leads received by team member" : "My leads received", ownerRows),
     ownerPerformanceReport(scope),
     statRows("Lead sources", countBy(scope, (lead) => lead.source || "Unknown source")),
     statRows("Contact outcomes", {
@@ -1067,7 +1132,19 @@ function fillLeadForm(lead = {}) {
   form.elements.lostAt.value = lead.lostAt || "";
   form.elements.outcomeNotes.value = lead.outcomeNotes || "";
   form.elements.message.value = lead.message || "";
+  document.querySelector("#leadNoteText").value = "";
+  renderLeadNotes(lead);
   document.querySelector("#engagementDraft").value = "";
+}
+
+function renderLeadNotes(lead = {}) {
+  const notes = Array.isArray(lead.notes) ? lead.notes : [];
+  document.querySelector("#leadNotesLog").innerHTML = notes.length ? notes.map((note) => `
+    <article class="note-entry">
+      <strong>${dateTimeLabel(note.at)}</strong>
+      <p>${escapeHtml(note.text)}</p>
+    </article>
+  `).join("") : emptyState("No notes yet.");
 }
 
 function openLeadDialog(lead) {
@@ -1194,6 +1271,7 @@ function saveLead(form, options = {}) {
     message: String(data.get("message") || "").trim(),
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    notes: existing?.notes || [],
     activity: existing?.activity || [],
   };
   if (existing) {
@@ -1355,6 +1433,29 @@ function scheduleTeamFormAutoSave() {
   teamFormAutoSaveTimer = window.setTimeout(() => {
     saveTeamMember(document.querySelector("#teamForm"), { silent: true });
   }, 650);
+}
+
+function addLeadNote() {
+  const text = document.querySelector("#leadNoteText").value.trim();
+  if (!text) {
+    showToast("Type a note first.");
+    return;
+  }
+  window.clearTimeout(leadFormAutoSaveTimer);
+  const form = document.querySelector("#leadForm");
+  const savedLead = saveLead(form, { activity: false, silent: true });
+  if (!savedLead) {
+    showToast("Add a lead name or source before adding a note.");
+    return;
+  }
+  savedLead.notes = Array.isArray(savedLead.notes) ? savedLead.notes : [];
+  savedLead.notes.unshift({ at: new Date().toISOString(), text });
+  addActivity(savedLead, "Lead note added.");
+  document.querySelector("#leadNoteText").value = "";
+  renderLeadNotes(savedLead);
+  saveAndSync({ immediate: true });
+  renderAll();
+  showToast("Note added.");
 }
 
 function leadRouterAppUrl() {
@@ -1904,6 +2005,7 @@ document.querySelector("#leadForm").addEventListener("submit", (event) => {
 });
 document.querySelector("#leadForm").addEventListener("input", scheduleLeadFormAutoSave);
 document.querySelector("#leadForm").addEventListener("change", scheduleLeadFormAutoSave);
+document.querySelector("#addLeadNoteButton").addEventListener("click", addLeadNote);
 document.querySelector("#copyDraftButton").addEventListener("click", copyEngagementDraft);
 document.querySelector("#openEmailDraftButton").addEventListener("click", openEmailDraft);
 

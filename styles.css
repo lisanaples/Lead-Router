@@ -565,6 +565,100 @@ p {
   color: var(--ink);
 }
 
+.chart-card {
+  align-content: start;
+}
+
+.donut-wrap {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.donut-chart {
+  position: relative;
+  display: grid;
+  width: 124px;
+  height: 124px;
+  place-items: center;
+  border-radius: 999px;
+}
+
+.donut-chart::after {
+  position: absolute;
+  inset: 28px;
+  border-radius: 999px;
+  background: white;
+  content: "";
+}
+
+.donut-chart span {
+  position: relative;
+  z-index: 1;
+  color: var(--teal-dark);
+  font-size: 1.35rem;
+  font-weight: 950;
+}
+
+.chart-legend,
+.notes-log {
+  display: grid;
+  gap: 7px;
+}
+
+.legend-row,
+.bar-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.legend-row i {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+}
+
+.bar-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.note-entry {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: rgba(245, 248, 248, 0.72);
+}
+
+.note-entry strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--teal-dark);
+  font-size: 0.76rem;
+}
+
+.note-entry p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .report-card h3 {
   margin: 0;
   font-size: 0.96rem;
@@ -938,6 +1032,11 @@ label {
 
   .performance-row {
     grid-template-columns: 1fr;
+  }
+
+  .donut-wrap {
+    grid-template-columns: 1fr;
+    justify-items: start;
   }
 }
 
