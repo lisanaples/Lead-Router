@@ -185,9 +185,11 @@ button {
 }
 
 .auth-form {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) auto auto;
+  grid-template-columns: minmax(280px, 1fr) minmax(240px, 1fr);
   width: 100%;
+  max-width: 760px;
 }
 
 .sync-actions {
@@ -199,6 +201,12 @@ button {
 
 .auth-form input {
   min-width: 0;
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.auth-form button {
+  min-height: 48px;
 }
 
 .auth-form button,
@@ -577,7 +585,7 @@ p {
   gap: 8px;
 }
 
-.preview-grid div {
+.preview-grid label {
   display: grid;
   gap: 3px;
   border: 1px solid var(--line);
@@ -593,9 +601,29 @@ p {
   text-transform: uppercase;
 }
 
-.preview-grid strong {
-  overflow-wrap: anywhere;
-  font-size: 0.92rem;
+.preview-grid input,
+.preview-grid select,
+.preview-notes-field textarea {
+  border-radius: 7px;
+  min-height: 40px;
+  padding: 8px 10px;
+  font-size: 0.95rem;
+}
+
+.preview-notes-field {
+  display: grid;
+  gap: 6px;
+}
+
+.preview-notes-field span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.preview-notes-field textarea {
+  min-height: 96px;
 }
 
 .parsed-lead-preview details {

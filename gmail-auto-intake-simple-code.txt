@@ -1,0 +1,84 @@
+const LEAD_ROUTER_WEBHOOK = "https://lead-router-29yb.vercel.app/api/inbound-lead?secret=PASTE_YOUR_SECRET_HERE";
+
+const INTAKE_LABEL = "Lead Router Intake";
+const PROCESSED_LABEL = "Lead Router Processed";
+const ERROR_LABEL = "Lead Router Error";
+
+function sendLeadEmailsToLeadRouter() {
+  var intakeLabel = GmailApp.getUserLabelByName(INTAKE_LABEL);
+  if (!intakeLabel) {
+    throw new Error("Missing Gmail label");
+  }
+
+  var processedLabel = getOrCreateLabel(PROCESSED_LABEL);
+  var errorLabel = getOrCreateLabel(ERROR_LABEL);
+  var threads = intakeLabel.getThreads(0, 20);
+
+  for (var i = 0; i < threads.length; i++) {
+    var thread = threads[i];
+    if (threadHasLabel(thread, PROCESSED_LABEL)) {
+      continue;
+    }
+
+    var messages = thread.getMessages();
+    var message = messages[messages.length - 1];
+    var body = message.getPlainBody();
+
+    var payload = {
+      raw: body,
+      source: guessSource(body)
+    };
+
+    try {
+      var response = UrlFetchApp.fetch(LEAD_ROUTER_WEBHOOK, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+
+      var code = response.getResponseCode();
+      if (code < 200 || code >= 300) {
+        throw new Error("Lead Router returned an error");
+      }
+
+      thread.addLabel(processedLabel);
+      thread.removeLabel(intakeLabel);
+    } catch (error) {
+      thread.addLabel(errorLabel);
+    }
+  }
+}
+
+function getOrCreateLabel(name) {
+  return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
+}
+
+function threadHasLabel(thread, labelName) {
+  var labels = thread.getLabels();
+  for (var i = 0; i < labels.length; i++) {
+    if (labels[i].getName() === labelName) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function guessSource(text) {
+  if (/zillow/i.test(text)) {
+    return "Zillow";
+  }
+  if (/realtor/i.test(text)) {
+    return "Realtor.com";
+  }
+  if (/homes/i.test(text)) {
+    return "Homes.com";
+  }
+  if (/reminder media/i.test(text)) {
+    return "Reminder Media";
+  }
+  if (/homesale/i.test(text)) {
+    return "HomeSale.com";
+  }
+  return "Email Lead";
+}

@@ -310,6 +310,10 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function escapeAttr(value) {
+  return escapeHtml(value);
+}
+
 function dateTimeLabel(value) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -1265,19 +1269,54 @@ function renderParsedLeadPreview(lead) {
       <span>${escapeHtml(lead.source)} · ${escapeHtml(lead.urgency)}</span>
     </div>
     <div class="preview-grid">
-      <div><span>Name</span><strong>${escapeHtml(lead.name || "New Lead")}</strong></div>
-      <div><span>Type</span><strong>${escapeHtml(lead.type || "Buyer")}</strong></div>
-      <div><span>Phone</span><strong>${escapeHtml(lead.phone || "Not found")}</strong></div>
-      <div><span>Email</span><strong>${escapeHtml(lead.email || "Not found")}</strong></div>
-      <div><span>Property / area</span><strong>${escapeHtml(lead.property || "Not found")}</strong></div>
-      <div><span>Price</span><strong>${escapeHtml(lead.price || "Not found")}</strong></div>
+      <label><span>Name</span><input name="name" value="${escapeAttr(lead.name || "New Lead")}" /></label>
+      <label><span>Type</span>
+        <select name="type">
+          <option ${lead.type === "Buyer" ? "selected" : ""}>Buyer</option>
+          <option ${lead.type === "Seller" ? "selected" : ""}>Seller</option>
+          <option ${lead.type === "Investor" ? "selected" : ""}>Investor</option>
+          <option ${lead.type === "Rental" ? "selected" : ""}>Rental</option>
+        </select>
+      </label>
+      <label><span>Phone</span><input name="phone" value="${escapeAttr(lead.phone || "")}" /></label>
+      <label><span>Email</span><input name="email" type="email" value="${escapeAttr(lead.email || "")}" /></label>
+      <label><span>Property / area</span><input name="property" value="${escapeAttr(lead.property || "")}" /></label>
+      <label><span>Price</span><input name="price" value="${escapeAttr(lead.price || "")}" /></label>
+      <label><span>Source</span><input name="source" value="${escapeAttr(lead.source || "Website")}" /></label>
+      <label><span>Urgency</span>
+        <select name="urgency">
+          <option ${lead.urgency === "Hot" ? "selected" : ""}>Hot</option>
+          <option ${lead.urgency === "Warm" ? "selected" : ""}>Warm</option>
+          <option ${lead.urgency === "Cold" ? "selected" : ""}>Cold</option>
+        </select>
+      </label>
     </div>
-    <p>${escapeHtml(lead.summary || lead.message || "No message found.")}</p>
+    <label class="preview-notes-field">
+      <span>Notes / message</span>
+      <textarea name="message">${escapeHtml(lead.summary || lead.message || "")}</textarea>
+    </label>
     <details>
       <summary>Full original email / notes</summary>
       <pre>${escapeHtml(lead.raw || lead.message || "")}</pre>
     </details>
   `;
+}
+
+function applyParsedLeadPreviewEdits() {
+  if (!parsedLeadDraft) return;
+  const preview = document.querySelector("#parsedLeadPreview");
+  parsedLeadDraft = {
+    ...parsedLeadDraft,
+    name: preview.querySelector('[name="name"]')?.value.trim() || "New Lead",
+    type: preview.querySelector('[name="type"]')?.value || "Buyer",
+    phone: preview.querySelector('[name="phone"]')?.value.trim() || "",
+    email: preview.querySelector('[name="email"]')?.value.trim() || "",
+    property: preview.querySelector('[name="property"]')?.value.trim() || "",
+    price: preview.querySelector('[name="price"]')?.value.trim() || "",
+    source: preview.querySelector('[name="source"]')?.value.trim() || "Website",
+    urgency: preview.querySelector('[name="urgency"]')?.value || "Warm",
+    message: preview.querySelector('[name="message"]')?.value.trim() || parsedLeadDraft.message || "",
+  };
 }
 
 function createLeadFromEmail() {
@@ -1297,6 +1336,7 @@ async function createParsedLeadAndNotify() {
     showToast("Preview a lead first.");
     return;
   }
+  applyParsedLeadPreviewEdits();
   try {
     const result = await authenticatedAppApiRequest("/api/manual-lead", {
       method: "POST",

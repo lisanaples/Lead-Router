@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=20" />
+    <link rel="stylesheet" href="styles.css?v=23" />
   </head>
   <body>
     <main class="app-shell">
@@ -73,8 +73,8 @@
           <form class="auth-form" id="authForm">
             <input id="authEmail" type="email" placeholder="Email" autocomplete="email" />
             <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" />
-            <button class="ghost-button" type="submit">Sign in</button>
-            <button class="primary-button" type="button" id="createAccountButton">Create account</button>
+            <button class="primary-button" type="submit">Sign in</button>
+            <button class="ghost-button" type="button" id="createAccountButton">Create account</button>
           </form>
           <div class="sync-actions">
             <button class="ghost-button" type="button" id="refreshCloudButton">Refresh cloud data</button>
@@ -428,7 +428,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=20"></script>
+    <script src="app.js?v=23"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         navigator.serviceWorker.register("service-worker.js");
