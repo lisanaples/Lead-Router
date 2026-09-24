@@ -394,6 +394,7 @@ function statusLabel(status) {
     converted: "Converted",
     nurture: "Nurture",
     doNotContact: "Archived - do not contact",
+    archived: "Archived",
     lost: "Lost",
     closed: "Closed sale",
   };
@@ -619,7 +620,7 @@ function addActivity(lead, text) {
 function leadCard(lead, compact = false) {
   const assigned = lead.assignedTo ? `Assigned to ${escapeHtml(lead.assignedTo)}` : "Available to claim";
   return `
-    <article class="lead-card ${lead.urgency.toLowerCase()} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
+    <article class="lead-card ${lead.urgency.toLowerCase()} status-${lead.status} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
       <div class="lead-main">
         <div>
           <strong>${escapeHtml(lead.name)}</strong>
@@ -676,7 +677,7 @@ function metricCard(label, value, helper) {
 function renderMetrics() {
   const scope = visibleLeads();
   const unclaimed = scope.filter((lead) => lead.status === "new").length;
-  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact"].includes(lead.status)).length;
+  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status)).length;
   const appointments = scope.filter((lead) => lead.status === "appointment").length;
   const hot = scope.filter((lead) => lead.urgency === "Hot" && lead.status !== "closed").length;
   const converted = scope.filter((lead) => lead.status === "converted").length;
@@ -692,7 +693,7 @@ function renderMetrics() {
 function renderDashboard() {
   const scope = visibleLeads();
   const unclaimed = scope.filter((lead) => lead.status === "new").sort(sortNewest);
-  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact"].includes(lead.status)).sort(sortNewest);
+  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status)).sort(sortNewest);
   document.querySelector("#unclaimedCount").textContent = unclaimed.length;
   document.querySelector("#claimedCount").textContent = claimed.length;
   document.querySelector("#unclaimedLeads").innerHTML = unclaimed.length ? unclaimed.map((lead) => leadCard(lead, true)).join("") : emptyState("No unclaimed leads.");
@@ -717,18 +718,7 @@ function filteredLeads() {
 
 function renderInbox() {
   const rows = filteredLeads();
-  document.querySelector("#leadTable").innerHTML = rows.length ? rows.map((lead) => `
-    <div class="table-row">
-      <strong>${escapeHtml(lead.name)}</strong>
-      <span>${escapeHtml(lead.source)} · ${escapeHtml(lead.type)}</span>
-      <span>${escapeHtml(lead.property || "No property")}</span>
-      <span>${escapeHtml(lead.assignedTo || "Unassigned")} · ${statusLabel(lead.status)}</span>
-      <div class="lead-actions">
-        <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
-        <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
-      </div>
-    </div>
-  `).join("") : emptyState("No leads match this view.");
+  document.querySelector("#leadTable").innerHTML = rows.length ? rows.map((lead) => leadCard(lead, true)).join("") : emptyState("No leads match this view.");
 }
 
 function renderTeam() {
@@ -772,6 +762,7 @@ function leadRank(lead) {
 }
 
 function pipelineGroupKey(lead) {
+  if (lead.status === "archived") return "doNotContact";
   if (lead.status === "converted") return "converted";
   if (lead.status === "consultation") return "consultation";
   if (lead.status === "appointment") return "appointment";
@@ -785,7 +776,7 @@ function pipelineGroupKey(lead) {
 
 function ownerLeads(owner) {
   return leads
-    .filter((lead) => lead.assignedTo === owner && !["closed", "lost", "doNotContact"].includes(lead.status))
+    .filter((lead) => lead.assignedTo === owner && !["closed", "lost", "doNotContact", "archived"].includes(lead.status))
     .sort((a, b) => leadRank(a) - leadRank(b) || sortNewest(a, b));
 }
 
@@ -798,7 +789,7 @@ function dailyWorkflowLeads(owner) {
 
 function workflowLeadCard(lead) {
   return `
-    <article class="lead-card ${lead.urgency.toLowerCase()} ${lead.status === "new" ? "" : "claimed"}">
+    <article class="lead-card ${lead.urgency.toLowerCase()} status-${lead.status} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
       <div class="lead-main">
         <div>
           <strong>${escapeHtml(lead.name)}</strong>
@@ -812,15 +803,14 @@ function workflowLeadCard(lead) {
         <span>${lead.nextFollowUpDate ? `Follow-up ${dateOnlyLabel(lead.nextFollowUpDate)}` : "Needs follow-up date"}</span>
       </div>
       <div class="lead-actions">
-        <button class="ghost-button" type="button" data-edit-lead="${lead.id}">Open</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="noContact">No contact</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="contacted">Contacted</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="appointment">Appointment</button>
         <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="doNotContact">Archive DNC</button>
+        <button class="ghost-button" type="button" data-archive-lead="${lead.id}">Archive</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
         <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
-        <button class="danger-button" type="button" data-delete-lead="${lead.id}">Delete</button>
       </div>
     </article>
   `;
@@ -880,7 +870,7 @@ function weeklyCheckInLeads() {
   const today = dateKey();
   const end = weekEndKey();
   return visibleLeads()
-    .filter((lead) => !["closed", "converted", "lost", "doNotContact"].includes(lead.status))
+    .filter((lead) => !["closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status))
     .filter((lead) => !lead.nextFollowUpDate || lead.nextFollowUpDate <= end)
     .sort((a, b) => (a.nextFollowUpDate || "0000-00-00").localeCompare(b.nextFollowUpDate || "0000-00-00") || leadRank(a) - leadRank(b))
     .map((lead) => ({
@@ -978,7 +968,7 @@ function ownerPerformanceRows(scope) {
     const ownerLeadsForRange = scope.filter((lead) => lead.assignedTo === owner);
     const contacted = ownerLeadsForRange.filter(madeContact).length;
     const noContact = ownerLeadsForRange.filter((lead) => lead.status === "noContact").length;
-    const archived = ownerLeadsForRange.filter((lead) => lead.status === "doNotContact").length;
+  const archived = ownerLeadsForRange.filter((lead) => ["doNotContact", "archived"].includes(lead.status)).length;
     return { owner, total: ownerLeadsForRange.length, contacted, noContact, archived };
   }).filter((row) => row.total || canManageAll());
 }
@@ -994,7 +984,7 @@ function ownerPerformanceReport(scope) {
           <span>${row.total} received</span>
           <span>${row.contacted} contacted (${percentLabel(row.contacted, row.total)})</span>
           <span>${row.noContact} no contact</span>
-          <span>${row.archived} archived DNC</span>
+          <span>${row.archived} archived</span>
         </div>
       `).join("") : `<div class="empty-state">No leads in this range.</div>`}
     </article>
@@ -1005,18 +995,18 @@ function renderReports() {
   const rangeSelect = document.querySelector("#reportRangeSelect");
   if (rangeSelect) rangeSelect.value = reportRange;
   const scope = reportScope();
-  const active = scope.filter((lead) => !["closed", "converted", "lost", "doNotContact"].includes(lead.status));
+  const active = scope.filter((lead) => !["closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status));
   const weekly = weeklyCheckInLeads();
   const overdue = weekly.filter((lead) => lead.checkInStatus === "Overdue").length;
   const noDate = weekly.filter((lead) => lead.checkInStatus === "Needs follow-up date").length;
   const contacted = scope.filter(madeContact).length;
   const noContact = scope.filter((lead) => lead.status === "noContact").length;
-  const archived = scope.filter((lead) => lead.status === "doNotContact").length;
+  const archived = scope.filter((lead) => ["doNotContact", "archived"].includes(lead.status)).length;
   document.querySelector("#reportMetrics").innerHTML = [
     metricCard("Leads received", scope.length, reportRangeLabel()),
     metricCard("Made contact", contacted, `${percentLabel(contacted, scope.length)} of received`),
     metricCard("No contact made", noContact, `${percentLabel(noContact, scope.length)} of received`),
-    metricCard("Archived DNC", archived, "Requested no contact"),
+    metricCard("Archived", archived, "Saved outside active work"),
     metricCard("Active funnel", active.length, "Open leads"),
     metricCard("Due follow-ups", weekly.length, `${overdue} overdue · ${noDate} no date`),
   ].join("");
@@ -1026,7 +1016,7 @@ function renderReports() {
     donutChart("Contact outcome mix", {
       "Made contact": contacted,
       "No contact made": noContact,
-      "Archived DNC": archived,
+      "Archived": archived,
       "Not worked yet": scope.filter((lead) => ["new", "claimed"].includes(lead.status)).length,
     }),
     barChart(canManageAll() ? "Leads received by team member" : "My leads received", ownerRows),
@@ -1035,7 +1025,7 @@ function renderReports() {
     statRows("Contact outcomes", {
       "Made contact": contacted,
       "No contact made": noContact,
-      "Requested no contact / archived": archived,
+      "Archived": archived,
       "Not worked yet": scope.filter((lead) => ["new", "claimed"].includes(lead.status)).length,
     }),
   ].join("");
@@ -1151,8 +1141,8 @@ function openLeadDialog(lead) {
   window.clearTimeout(leadFormAutoSaveTimer);
   fillLeadForm(lead);
   document.querySelector("#leadDialogTitle").textContent = lead ? "Edit Lead" : "Add Lead";
-  document.querySelector("#deleteLeadButton").classList.toggle("hidden", !lead);
-  document.querySelector("#deleteLeadButton").dataset.deleteLead = lead?.id || "";
+  document.querySelector("#archiveLeadButton").classList.toggle("hidden", !lead);
+  document.querySelector("#archiveLeadButton").dataset.archiveLead = lead?.id || "";
   document.querySelector("#leadDialog").showModal();
 }
 
@@ -1293,17 +1283,19 @@ function saveLead(form, options = {}) {
   return lead;
 }
 
-function deleteLead(leadId) {
+function archiveLead(leadId) {
   const id = Number(leadId);
   const lead = leads.find((entry) => entry.id === id);
   if (!lead) return;
-  const confirmed = window.confirm(`Delete ${lead.name || "this lead"}? This removes it from the shared workspace.`);
+  const confirmed = window.confirm(`Archive ${lead.name || "this lead"}? You can still find it later by filtering for Archived.`);
   if (!confirmed) return;
-  leads = leads.filter((entry) => entry.id !== id);
+  lead.status = "archived";
+  lead.lostAt = lead.lostAt || dateKey();
+  addActivity(lead, "Lead archived.");
   saveAndSync({ silent: false });
   document.querySelector("#leadDialog")?.close();
   renderAll();
-  showToast("Lead deleted.");
+  showToast("Lead archived.");
 }
 
 function claimLead(leadId, memberId) {
@@ -1739,6 +1731,7 @@ function normalizeLeadStatus(value) {
   const normalized = String(value || "").toLowerCase();
   const compact = normalized.replace(/[^a-z0-9]+/g, "");
   if (normalized.includes("do not contact") || compact.includes("donotcontact") || normalized.includes("dnc")) return "doNotContact";
+  if (normalized.includes("archive")) return "archived";
   if (normalized.includes("no contact") || compact.includes("nocontact")) return "noContact";
   if (normalized.includes("converted") || normalized.includes("client")) return "converted";
   if (normalized.includes("consult")) return "consultation";
@@ -1893,7 +1886,7 @@ function downloadLeadPerformanceReport() {
       lead.source,
       statusLabel(lead.status),
       lead.createdAt ? dateOnlyLabel(lead.createdAt.slice(0, 10)) : "",
-      lead.status === "doNotContact" ? "Requested no contact / archived" : madeContact(lead) ? "Made contact" : lead.status === "noContact" ? "No contact made" : "Not worked yet",
+      ["doNotContact", "archived"].includes(lead.status) ? "Archived" : madeContact(lead) ? "Made contact" : lead.status === "noContact" ? "No contact made" : "Not worked yet",
       lead.phone,
       lead.email,
       lead.property,
@@ -1954,8 +1947,8 @@ document.addEventListener("click", (event) => {
     openLeadDialog(leads.find((lead) => lead.id === Number(openLead.dataset.openLead)));
   }
 
-  const deleteButton = event.target.closest("[data-delete-lead]");
-  if (deleteButton) deleteLead(deleteButton.dataset.deleteLead);
+  const archiveButton = event.target.closest("[data-archive-lead]");
+  if (archiveButton) archiveLead(archiveButton.dataset.archiveLead);
 
   const claim = event.target.closest("[data-claim-lead]");
   if (claim) claimLead(claim.dataset.claimLead, claim.dataset.member);

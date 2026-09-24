@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=30" />
+    <link rel="stylesheet" href="styles.css?v=31" />
   </head>
   <body>
     <main class="app-shell">
@@ -202,6 +202,7 @@
                   <option value="converted">Converted</option>
                   <option value="nurture">Nurture</option>
                   <option value="doNotContact">Do not contact</option>
+                  <option value="archived">Archived</option>
                   <option value="lost">Lost</option>
                   <option value="closed">Closed sale</option>
                 </select>
@@ -365,6 +366,7 @@
               <option value="converted">Converted</option>
               <option value="nurture">Nurture</option>
               <option value="doNotContact">Do not contact</option>
+              <option value="archived">Archived</option>
               <option value="lost">Lost</option>
               <option value="closed">Closed sale</option>
             </select>
@@ -440,7 +442,7 @@
           </div>
         </section>
         <div class="dialog-actions">
-          <button class="danger-button hidden" type="button" id="deleteLeadButton">Delete lead</button>
+          <button class="danger-button hidden" type="button" id="archiveLeadButton">Archive lead</button>
           <button class="primary-button" type="button" data-close-dialog>Done</button>
         </div>
       </form>
@@ -487,7 +489,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=30"></script>
+    <script src="app.js?v=31"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
