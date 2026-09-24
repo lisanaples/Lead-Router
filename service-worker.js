@@ -1,9 +1,9 @@
-const CACHE_NAME = "lead-router-v37";
+const CACHE_NAME = "lead-router-v39";
 const APP_SHELL = [
   "./",
   "index.html",
-  "styles.css?v=37",
-  "app.js?v=37",
+  "styles.css?v=39",
+  "app.js?v=39",
   "assets/lead-router-icon.svg",
   "manifest.webmanifest"
 ];
@@ -27,6 +27,20 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (new URL(event.request.url).pathname.startsWith("/api/")) return;
+
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put("index.html", copy));
+          return response;
+        })
+        .catch(() => caches.match("index.html"))
+    );
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -36,6 +50,10 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("index.html")))
   );
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("push", (event) => {

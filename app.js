@@ -308,6 +308,36 @@ function saveAndSync(options = {}) {
   }, options.immediate ? 0 : 900);
 }
 
+function currentAppVersion() {
+  const script = document.querySelector('script[src*="app.js?v="]');
+  return script?.src.match(/[?&]v=(\d+)/)?.[1] || "";
+}
+
+async function checkForAppUpdate(options = {}) {
+  if (location.protocol === "file:") return;
+  try {
+    const response = await fetch(`${location.pathname || "/"}?leadRelayUpdate=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    const html = await response.text();
+    const latestVersion = html.match(/app\.js\?v=(\d+)/)?.[1] || "";
+    const currentVersion = currentAppVersion();
+    if (latestVersion && currentVersion && latestVersion !== currentVersion) {
+      showToast("Lead Relay has an update. Refreshing now.");
+      if ("serviceWorker" in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((registration) => registration.update()));
+      }
+      window.setTimeout(() => window.location.reload(), 750);
+    } else if (!options.silent) {
+      showToast("Lead Relay is up to date.");
+    }
+  } catch {
+    if (!options.silent) showToast("Could not check for an app update.");
+  }
+}
+
 function escapeHtml(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -813,8 +843,6 @@ function miniLeadTile(lead) {
   return `
     <article class="lead-mini-tile status-${lead.status} ${lead.urgency.toLowerCase()}" data-open-lead="${lead.id}" title="${escapeAttr(statusLabel(lead.status))}${lead.source ? ` - ${escapeAttr(lead.source)}` : ""}">
       <strong>${escapeHtml(lead.name)}</strong>
-      <span>${Number(lead.contactAttempts || 0)} attempts</span>
-      <button type="button" data-attempt-lead="${lead.id}" title="Log contact attempt">+</button>
     </article>
   `;
 }
@@ -2163,3 +2191,8 @@ document.querySelector("#notifyAll").addEventListener("change", (event) => {
 renderAll();
 if (cloudSession?.access_token) refreshFromCloud({ silent: true });
 processClaimLink();
+checkForAppUpdate({ silent: true });
+window.setInterval(() => checkForAppUpdate({ silent: true }), 5 * 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkForAppUpdate({ silent: true });
+});
