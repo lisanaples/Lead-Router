@@ -105,6 +105,7 @@ team = team.map((member) => ({
 leads = leads.map((lead) => ({
   ...lead,
   notes: Array.isArray(lead.notes) ? lead.notes : [],
+  contactAttempts: Number(lead.contactAttempts || 0),
   nextFollowUpDate: lead.nextFollowUpDate || "",
   firstAttemptedAt: lead.firstAttemptedAt || "",
   firstContactedAt: lead.firstContactedAt || "",
@@ -816,6 +817,16 @@ function workflowLeadCard(lead) {
   `;
 }
 
+function miniLeadTile(lead) {
+  return `
+    <article class="lead-mini-tile status-${lead.status} ${lead.urgency.toLowerCase()}" data-open-lead="${lead.id}" title="${escapeAttr(statusLabel(lead.status))}${lead.source ? ` - ${escapeAttr(lead.source)}` : ""}">
+      <strong>${escapeHtml(lead.name)}</strong>
+      <span>${Number(lead.contactAttempts || 0)} attempts</span>
+      <button type="button" data-attempt-lead="${lead.id}" title="Log contact attempt">+</button>
+    </article>
+  `;
+}
+
 function renderWorkflow() {
   const owner = workflowOwner || team[0]?.name || "";
   const daily = dailyWorkflowLeads(owner);
@@ -839,23 +850,56 @@ function renderWorkflow() {
 
 function renderLeadBucket(listId, countId, items, emptyText) {
   document.querySelector(`#${countId}`).textContent = items.length;
-  document.querySelector(`#${listId}`).innerHTML = items.length ? items.map(workflowLeadCard).join("") : emptyState(emptyText);
+  document.querySelector(`#${listId}`).innerHTML = items.length ? items.map(miniLeadTile).join("") : emptyState(emptyText);
+}
+
+function hotTasksFor(owner) {
+  const today = dateKey();
+  return ownerLeads(owner)
+    .filter((lead) => (
+      !lead.nextFollowUpDate ||
+      lead.nextFollowUpDate <= today ||
+      (lead.urgency === "Hot" && !madeContact(lead))
+    ))
+    .sort((a, b) => (a.nextFollowUpDate || "0000-00-00").localeCompare(b.nextFollowUpDate || "0000-00-00") || leadRank(a) - leadRank(b));
+}
+
+function taskReason(lead) {
+  const today = dateKey();
+  if (!lead.nextFollowUpDate) return "Needs follow-up date";
+  if (lead.nextFollowUpDate < today) return `Overdue ${dateOnlyLabel(lead.nextFollowUpDate)}`;
+  if (lead.nextFollowUpDate === today) return "Due today";
+  if (lead.urgency === "Hot" && !madeContact(lead)) return "Hot lead";
+  return statusLabel(lead.status);
+}
+
+function renderHotTasks() {
+  const tasks = hotTasksFor(myOwner);
+  document.querySelector("#hotTaskCount").textContent = tasks.length;
+  document.querySelector("#hotTaskList").innerHTML = tasks.length ? tasks.map((lead) => `
+    <article class="hot-task status-${lead.status}" data-open-lead="${lead.id}">
+      <strong>${escapeHtml(lead.name)}</strong>
+      <span>${escapeHtml(taskReason(lead))}</span>
+      <em>${Number(lead.contactAttempts || 0)} attempts</em>
+      <button type="button" data-attempt-lead="${lead.id}">+ Attempt</button>
+    </article>
+  `).join("") : emptyState("No hot tasks right now.");
 }
 
 function renderMyLeads() {
   const mine = ownerLeads(myOwner);
-  const today = dateKey();
-  const due = mine.filter((lead) => !lead.nextFollowUpDate || lead.nextFollowUpDate <= today);
-  const newUnworked = mine.filter((lead) => ["new", "claimed"].includes(lead.status) && !lead.firstAttemptedAt && !lead.firstContactedAt);
-  const hot = mine.filter((lead) => lead.urgency === "Hot" && !["converted", "lost", "closed"].includes(lead.status));
-  const contacted = mine.filter((lead) => ["attempted", "contacted"].includes(lead.status));
+  const newOrClaimed = mine.filter((lead) => ["new", "claimed"].includes(lead.status));
+  const attempted = mine.filter((lead) => ["attempted", "noContact"].includes(lead.status));
+  const contacted = mine.filter((lead) => lead.status === "contacted");
+  const appointment = mine.filter((lead) => ["appointment", "consultation"].includes(lead.status));
   const nurture = mine.filter((lead) => lead.status === "nurture" || lead.urgency === "Nurture");
 
-  renderLeadBucket("myDueLeads", "myDueCount", due, "Nothing due today.");
-  renderLeadBucket("myNewLeads", "myNewCount", newUnworked, "No untouched leads.");
-  renderLeadBucket("myHotLeads", "myHotCount", hot, "No hot leads.");
-  renderLeadBucket("myContactedLeads", "myContactedCount", contacted, "No contacted leads waiting for next step.");
+  renderLeadBucket("myDueLeads", "myDueCount", newOrClaimed, "No new or claimed leads.");
+  renderLeadBucket("myNewLeads", "myNewCount", attempted, "No attempted leads.");
+  renderLeadBucket("myHotLeads", "myHotCount", contacted, "No contacted leads.");
+  renderLeadBucket("myContactedLeads", "myContactedCount", appointment, "No appointments yet.");
   renderLeadBucket("myNurtureLeads", "myNurtureCount", nurture, "No nurture leads.");
+  renderHotTasks();
 }
 
 function countBy(items, getKey) {
@@ -1262,6 +1306,7 @@ function saveLead(form, options = {}) {
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     notes: existing?.notes || [],
+    contactAttempts: Number(existing?.contactAttempts || 0),
     activity: existing?.activity || [],
   };
   if (existing) {
@@ -1329,10 +1374,27 @@ function updateLeadStatus(leadId, status) {
   showToast("Lead status updated.");
 }
 
+function logContactAttempt(leadId) {
+  const lead = leads.find((entry) => entry.id === Number(leadId));
+  if (!lead) return;
+  const today = dateKey();
+  lead.contactAttempts = Number(lead.contactAttempts || 0) + 1;
+  lead.firstAttemptedAt = lead.firstAttemptedAt || today;
+  if (["new", "claimed"].includes(lead.status)) lead.status = "attempted";
+  addActivity(lead, `Contact attempt #${lead.contactAttempts} logged.`);
+  saveAndSync();
+  renderAll();
+  showToast(`Attempt #${lead.contactAttempts} logged for ${lead.name}.`);
+}
+
 function updateResponseMilestone(leadId, response) {
   const lead = leads.find((entry) => entry.id === Number(leadId));
   if (!lead) return;
   const today = dateKey();
+  if (response === "attempted") {
+    logContactAttempt(leadId);
+    return;
+  }
   const updates = {
     attempted: ["firstAttemptedAt", "attempted", "First contact attempt logged."],
     noContact: ["firstAttemptedAt", "noContact", "No contact made."],
@@ -1833,7 +1895,7 @@ function downloadOwnerLeads(owner) {
   const ownerName = owner || workflowOwner || team[0]?.name || "";
   const rows = leads.filter((lead) => lead.assignedTo === ownerName);
   downloadCsv(`${ownerName || "unassigned"}-leads.csv`, [
-    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Next Follow-Up", "First Attempted", "First Contacted", "Appointment Set", "Consultation Completed", "Converted", "Lost", "Outcome Notes", "Message"],
+    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Contact Attempts", "Next Follow-Up", "First Attempted", "First Contacted", "Appointment Set", "Consultation Completed", "Converted", "Lost", "Outcome Notes", "Message"],
     ...rows.map((lead) => [
       lead.name,
       lead.phone,
@@ -1844,6 +1906,7 @@ function downloadOwnerLeads(owner) {
       lead.price,
       lead.urgency,
       statusLabel(lead.status),
+      lead.contactAttempts || 0,
       lead.nextFollowUpDate,
       lead.firstAttemptedAt,
       lead.firstContactedAt,
@@ -1879,13 +1942,14 @@ function downloadWeeklyReport() {
 function downloadLeadPerformanceReport() {
   const scope = reportScope();
   downloadCsv(`lead-performance-${reportRange}.csv`, [
-    ["Name", "Owner", "Source", "Status", "Created", "Contact Outcome", "Phone", "Email", "Property", "Message"],
+    ["Name", "Owner", "Source", "Status", "Created", "Contact Attempts", "Contact Outcome", "Phone", "Email", "Property", "Message"],
     ...scope.map((lead) => [
       lead.name,
       lead.assignedTo || "Unassigned",
       lead.source,
       statusLabel(lead.status),
       lead.createdAt ? dateOnlyLabel(lead.createdAt.slice(0, 10)) : "",
+      lead.contactAttempts || 0,
       ["doNotContact", "archived"].includes(lead.status) ? "Archived" : madeContact(lead) ? "Made contact" : lead.status === "noContact" ? "No contact made" : "Not worked yet",
       lead.phone,
       lead.email,
@@ -1946,6 +2010,9 @@ document.addEventListener("click", (event) => {
   if (openLead && !event.target.closest("button, a, input, select, textarea")) {
     openLeadDialog(leads.find((lead) => lead.id === Number(openLead.dataset.openLead)));
   }
+
+  const attemptLead = event.target.closest("[data-attempt-lead]");
+  if (attemptLead) logContactAttempt(attemptLead.dataset.attemptLead);
 
   const archiveButton = event.target.closest("[data-archive-lead]");
   if (archiveButton) archiveLead(archiveButton.dataset.archiveLead);

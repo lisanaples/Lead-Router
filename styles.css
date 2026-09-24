@@ -553,8 +553,72 @@ p {
 
 .my-leads-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.hot-task-panel {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(217, 164, 65, 0.38);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff9ed;
+}
+
+.hot-task-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 6px;
+}
+
+.hot-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
+  align-items: center;
+  border: 1px solid rgba(18, 56, 73, 0.1);
+  border-left: 5px solid var(--gold);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: white;
+  cursor: pointer;
+}
+
+.hot-task strong,
+.hot-task span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hot-task strong {
+  font-size: 0.84rem;
+}
+
+.hot-task span,
+.hot-task em {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.hot-task button,
+.lead-mini-tile button {
+  min-height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--teal);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.hot-task button {
+  grid-row: span 2;
+  padding: 0 8px;
 }
 
 .owner-pipeline {
@@ -734,13 +798,96 @@ p {
 .pipeline-column-card {
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
   background: rgba(245, 248, 248, 0.7);
 }
 
 .pipeline-column-card .empty-state {
-  min-height: 54px;
+  min-height: 42px;
   font-size: 0.78rem;
+}
+
+.pipeline-column-card .lead-list {
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 5px;
+}
+
+.lead-mini-tile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 6px;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid rgba(18, 56, 73, 0.12);
+  border-left: 5px solid var(--teal);
+  border-radius: 7px;
+  padding: 5px 7px;
+  background: white;
+  color: var(--ink);
+  cursor: pointer;
+  transition: 120ms ease;
+}
+
+.lead-mini-tile:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 16px rgba(18, 56, 73, 0.08);
+}
+
+.lead-mini-tile strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.76rem;
+  font-weight: 950;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-mini-tile span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-mini-tile button {
+  grid-row: span 2;
+  width: 24px;
+  padding: 0;
+}
+
+.lead-mini-tile.status-new {
+  border-left-color: var(--rose);
+  background: #fff5f8;
+}
+
+.lead-mini-tile.status-claimed {
+  border-left-color: var(--teal);
+  background: #f2f8f8;
+}
+
+.lead-mini-tile.status-attempted,
+.lead-mini-tile.status-noContact {
+  border-left-color: var(--gold);
+  background: #fff9ed;
+}
+
+.lead-mini-tile.status-contacted {
+  border-left-color: #20bfd4;
+  background: #eefbfe;
+}
+
+.lead-mini-tile.status-appointment,
+.lead-mini-tile.status-consultation {
+  border-left-color: #7fb069;
+  background: #f1faf0;
+}
+
+.lead-mini-tile.status-nurture {
+  border-left-color: #8b95a1;
+  background: #f4f6f7;
 }
 
 .activity-log,
@@ -895,6 +1042,15 @@ select {
   background: white;
   color: var(--ink);
   padding: 9px 10px;
+  box-shadow: inset 0 1px 0 rgba(18, 56, 73, 0.03);
+}
+
+textarea:focus,
+input:focus,
+select:focus {
+  border-color: rgba(18, 56, 73, 0.42);
+  box-shadow: 0 0 0 3px rgba(32, 191, 212, 0.16);
+  outline: 0;
 }
 
 textarea {
@@ -966,6 +1122,31 @@ dialog::backdrop {
   display: grid;
   gap: 14px;
   padding: 20px;
+  background:
+    radial-gradient(circle at top left, rgba(217, 164, 65, 0.18), transparent 32%),
+    linear-gradient(135deg, rgba(18, 56, 73, 0.08), rgba(32, 191, 212, 0.08)),
+    #f4f8f8;
+}
+
+.dialog-panel > div:first-of-type {
+  border-bottom: 1px solid rgba(18, 56, 73, 0.12);
+  padding: 0 44px 10px 0;
+}
+
+.dialog-panel .form-grid > label,
+.dialog-panel > label,
+.tracking-section {
+  border: 1px solid rgba(18, 56, 73, 0.12);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 18px rgba(18, 56, 73, 0.04);
+}
+
+.tracking-section .form-grid > label,
+.tracking-section > label {
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: none;
 }
 
 .dialog-actions {

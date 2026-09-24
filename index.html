@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=31" />
+    <link rel="stylesheet" href="styles.css?v=34" />
   </head>
   <body>
     <main class="app-shell">
@@ -45,15 +45,6 @@
             </div>
           </div>
           <div class="topbar-actions">
-            <button class="ghost-button" type="button" id="exportButton">Export</button>
-            <label class="import-button">
-              Import
-              <input id="importInput" type="file" accept="application/json" />
-            </label>
-            <label class="import-button master-only">
-              Import FiveStreet CSV
-              <input id="csvImportInput" type="file" accept=".csv,text/csv" />
-            </label>
             <button class="primary-button master-only" type="button" id="openLeadForm">Add lead</button>
           </div>
         </header>
@@ -123,31 +114,38 @@
               </div>
               <button class="ghost-button" type="button" id="downloadMyLeads">Download my leads</button>
             </div>
+            <section class="hot-task-panel">
+              <div class="section-title">
+                <h3>Hot tasks</h3>
+                <span id="hotTaskCount">0</span>
+              </div>
+              <div class="hot-task-list" id="hotTaskList"></div>
+            </section>
             <section class="my-leads-grid">
               <article class="pipeline-column-card">
                 <div class="section-title">
-                  <h3>Due today</h3>
+                  <h3>New / claimed</h3>
                   <span id="myDueCount">0</span>
                 </div>
                 <div class="lead-list compact" id="myDueLeads"></div>
               </article>
               <article class="pipeline-column-card">
                 <div class="section-title">
-                  <h3>New / not contacted</h3>
+                  <h3>Attempted</h3>
                   <span id="myNewCount">0</span>
                 </div>
                 <div class="lead-list compact" id="myNewLeads"></div>
               </article>
               <article class="pipeline-column-card">
                 <div class="section-title">
-                  <h3>Hot</h3>
+                  <h3>Contacted</h3>
                   <span id="myHotCount">0</span>
                 </div>
                 <div class="lead-list compact" id="myHotLeads"></div>
               </article>
               <article class="pipeline-column-card">
                 <div class="section-title">
-                  <h3>Contacted, no appointment</h3>
+                  <h3>Appointment</h3>
                   <span id="myContactedCount">0</span>
                 </div>
                 <div class="lead-list compact" id="myContactedLeads"></div>
@@ -317,6 +315,21 @@
               <div class="setup-actions">
                 <button class="ghost-button small-button" type="button" id="enablePushButton">Enable push alerts</button>
                 <button class="ghost-button small-button" type="button" id="testPushButton">Send test push</button>
+              </div>
+            </div>
+            <div class="settings-card">
+              <strong>Data tools</strong>
+              <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
+              <div class="setup-actions">
+                <button class="ghost-button small-button" type="button" id="exportButton">Export backup</button>
+                <label class="import-button small-button">
+                  Import backup
+                  <input id="importInput" type="file" accept="application/json" />
+                </label>
+                <label class="import-button small-button master-only">
+                  Import FiveStreet CSV
+                  <input id="csvImportInput" type="file" accept=".csv,text/csv" />
+                </label>
               </div>
             </div>
           </section>
@@ -489,7 +502,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=31"></script>
+    <script src="app.js?v=34"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
