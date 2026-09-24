@@ -790,28 +790,19 @@ function dailyWorkflowLeads(owner) {
 
 function workflowLeadCard(lead) {
   return `
-    <article class="lead-card ${lead.urgency.toLowerCase()} status-${lead.status} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
-      <div class="lead-main">
-        <div>
-          <strong>${escapeHtml(lead.name)}</strong>
-          <span>${escapeHtml(lead.property || "No property")}</span>
-        </div>
-        <span class="status-pill">${statusLabel(lead.status)}</span>
+    <article class="workflow-task status-${lead.status} ${lead.urgency.toLowerCase()}" data-open-lead="${lead.id}">
+      <div class="workflow-task-main">
+        <strong>${escapeHtml(lead.name)}</strong>
+        <span>${escapeHtml(lead.source || "Lead")} · ${escapeHtml(taskReason(lead))}</span>
+        <em>${Number(lead.contactAttempts || 0)} attempts · ${escapeHtml(statusLabel(lead.status))}</em>
       </div>
-      <div class="lead-meta">
-        <span>${escapeHtml(lead.source)}</span>
-        <span>${escapeHtml(lead.urgency)}</span>
-        <span>${lead.nextFollowUpDate ? `Follow-up ${dateOnlyLabel(lead.nextFollowUpDate)}` : "Needs follow-up date"}</span>
-      </div>
-      <div class="lead-actions">
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="attempted">Attempted</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="noContact">No contact</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="contacted">Contacted</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="appointment">Appointment</button>
-        <button class="ghost-button" type="button" data-response-lead="${lead.id}" data-response="doNotContact">Archive DNC</button>
-        <button class="ghost-button" type="button" data-archive-lead="${lead.id}">Archive</button>
-        <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
-        <button class="ghost-button" type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
+      <div class="workflow-task-actions">
+        <button type="button" data-attempt-lead="${lead.id}" data-attempt-type="Call">Call</button>
+        <button type="button" data-attempt-lead="${lead.id}" data-attempt-type="Text">Text</button>
+        <button type="button" data-attempt-lead="${lead.id}" data-attempt-type="Email">Email</button>
+        <button type="button" data-response-lead="${lead.id}" data-response="contacted">Contacted</button>
+        <button type="button" data-followup-lead="${lead.id}" data-days="1">Tomorrow</button>
+        <button type="button" data-followup-lead="${lead.id}" data-days="7">Next week</button>
       </div>
     </article>
   `;
@@ -1374,17 +1365,18 @@ function updateLeadStatus(leadId, status) {
   showToast("Lead status updated.");
 }
 
-function logContactAttempt(leadId) {
+function logContactAttempt(leadId, attemptType = "Contact") {
   const lead = leads.find((entry) => entry.id === Number(leadId));
   if (!lead) return;
   const today = dateKey();
+  const label = attemptType || "Contact";
   lead.contactAttempts = Number(lead.contactAttempts || 0) + 1;
   lead.firstAttemptedAt = lead.firstAttemptedAt || today;
   if (["new", "claimed"].includes(lead.status)) lead.status = "attempted";
-  addActivity(lead, `Contact attempt #${lead.contactAttempts} logged.`);
+  addActivity(lead, `${label} attempt #${lead.contactAttempts} logged.`);
   saveAndSync();
   renderAll();
-  showToast(`Attempt #${lead.contactAttempts} logged for ${lead.name}.`);
+  showToast(`${label} attempt #${lead.contactAttempts} logged for ${lead.name}.`);
 }
 
 function updateResponseMilestone(leadId, response) {
@@ -2012,7 +2004,7 @@ document.addEventListener("click", (event) => {
   }
 
   const attemptLead = event.target.closest("[data-attempt-lead]");
-  if (attemptLead) logContactAttempt(attemptLead.dataset.attemptLead);
+  if (attemptLead) logContactAttempt(attemptLead.dataset.attemptLead, attemptLead.dataset.attemptType);
 
   const archiveButton = event.target.closest("[data-archive-lead]");
   if (archiveButton) archiveLead(archiveButton.dataset.archiveLead);
