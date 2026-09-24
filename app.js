@@ -8,6 +8,7 @@ const LAST_AUTO_SYNC_KEY = "lead-router-last-auto-sync-v1";
 const SUPABASE_URL = "https://bzjsalaacldusmswkygw.supabase.co";
 const SUPABASE_KEY = "sb_publishable_wvNqklMeEgNe21HquCDiWg_F22bTjMA";
 const CLOUD_RECORD_ID = "lead-router-shared-workspace";
+const LEAD_RELAY_APP_URL = "https://lead-router-29yb.vercel.app/";
 const TEAM_STATUSES = ["Available", "On call", "Backup only", "Paused", "Out of office", "Admin only"];
 const ROUTING_STATUSES = ["Available", "On call"];
 const FULL_ACCESS_ROLES = ["Full access"];
@@ -733,7 +734,7 @@ function renderTeam() {
       <span>${escapeHtml(member.inviteStatus || "Not invited")}</span>
       <div class="lead-actions">
         <button class="ghost-button" type="button" data-edit-team="${member.id}">Edit</button>
-        <button class="ghost-button" type="button" data-invite-team="${member.id}">Invite</button>
+        <button class="ghost-button" type="button" data-invite-team="${member.id}">Prepare invite email</button>
         <button class="ghost-button" type="button" data-download-owner="${escapeHtml(member.name)}">Download leads</button>
       </div>
     </article>
@@ -1461,7 +1462,7 @@ function saveTeamMember(form, options = {}) {
   renderAll();
   if (options.toast) showToast(existing ? "Team member updated." : "Team member added.");
   if (options.promptInvite && !existing && member.email) {
-    const wantsInvite = window.confirm(`Invite ${member.name} to Lead Relay now?`);
+    const wantsInvite = window.confirm(`Prepare an invite email for ${member.name} now?`);
     if (wantsInvite) sendTeamInvite(member.id);
   }
   return member;
@@ -1505,7 +1506,7 @@ function addLeadNote() {
 }
 
 function leadRouterAppUrl() {
-  if (location.protocol === "file:") return "[paste your deployed Lead Relay Vercel link here]";
+  if (location.protocol === "file:") return LEAD_RELAY_APP_URL;
   return location.origin + location.pathname;
 }
 
@@ -1513,14 +1514,14 @@ function teamInviteBody(member) {
   const accessLine = fullAccessFor(member)
     ? "You will have full-access assistant/admin access, which means you can see the full team lead workspace."
     : "You will have team-member access, which means you can see unclaimed leads and the leads you claim.";
-  return `Hi ${member.name},\n\nI am inviting you to Lead Relay, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone in Safari:\n${leadRouterAppUrl()}\n\n2. Create an account using this email address:\n${member.email}\n\n3. After signing in, choose yourself under Working as if it is not already selected.\n\n4. Tap Share in Safari, then Add to Home Screen so Lead Relay works like an app.\n\n5. Open the app from the Home Screen and tap Enable push alerts so you can receive lead notifications.\n\nOnce a lead comes in, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
+  return `Hi ${member.name},\n\nI am inviting you to Lead Relay, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone:\n${leadRouterAppUrl()}\n\n2. Create an account using this exact email address:\n${member.email}\n\n3. Sign in, then choose yourself under Working as if it is not already selected.\n\n4. Add Lead Relay to your phone home screen:\n- iPhone: open the link in Safari, tap Share, then Add to Home Screen.\n- Android: open the link in Chrome, tap the menu, then Add to Home screen or Install app.\n\n5. Open Lead Relay from the Home Screen and tap Enable push alerts. If your phone asks whether to allow notifications, choose Allow.\n\nOnce a lead comes in, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
 }
 
 function sendTeamInvite(memberId) {
   const member = team.find((entry) => entry.id === Number(memberId));
   if (!member) return;
   if (!member.email) {
-    showToast("Add an email before sending an invite.");
+    showToast("Add an email before preparing an invite.");
     return;
   }
   member.inviteStatus = "Invited";
@@ -1529,7 +1530,7 @@ function sendTeamInvite(memberId) {
   const subject = encodeURIComponent("Lead Relay app invitation");
   const body = encodeURIComponent(teamInviteBody(member));
   window.location.href = `mailto:${encodeURIComponent(member.email)}?subject=${subject}&body=${body}`;
-  showToast(`Invite prepared for ${member.name}.`);
+  showToast(`Invite email prepared for ${member.name}.`);
 }
 
 function toggleTeamMember(id) {
