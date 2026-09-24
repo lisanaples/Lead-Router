@@ -330,7 +330,53 @@ p {
 }
 
 .metric-card {
+  position: relative;
+  overflow: hidden;
   padding: 14px;
+}
+
+.metric-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--teal);
+}
+
+.metric-card.metric-rose {
+  background: linear-gradient(135deg, #fff5f8, #ffffff);
+}
+
+.metric-card.metric-rose::before {
+  background: var(--rose);
+}
+
+.metric-card.metric-teal {
+  background: linear-gradient(135deg, #eef7f8, #ffffff);
+}
+
+.metric-card.metric-gold {
+  background: linear-gradient(135deg, #fff6df, #ffffff);
+}
+
+.metric-card.metric-gold::before {
+  background: var(--gold);
+}
+
+.metric-card.metric-green {
+  background: linear-gradient(135deg, #edf9ec, #ffffff);
+}
+
+.metric-card.metric-green::before {
+  background: #7fb069;
+}
+
+.metric-card.metric-blue {
+  background: linear-gradient(135deg, #e8fbff, #ffffff);
+}
+
+.metric-card.metric-blue::before {
+  background: #20bfd4;
 }
 
 .metric-card span,
@@ -372,6 +418,25 @@ p {
   gap: 16px;
 }
 
+#dashboardView > .desk-layout > .panel:first-child {
+  border-color: rgba(229, 72, 123, 0.28);
+  background:
+    radial-gradient(circle at top right, rgba(229, 72, 123, 0.08), transparent 42%),
+    rgba(255, 255, 255, 0.94);
+}
+
+#dashboardView > .desk-layout > .panel:first-child .count-pill {
+  background: #fff0f5;
+  color: var(--rose);
+}
+
+#dashboardView > .desk-layout > .panel:nth-child(2) {
+  border-color: rgba(18, 56, 73, 0.16);
+  background:
+    radial-gradient(circle at top right, rgba(32, 191, 212, 0.08), transparent 42%),
+    rgba(255, 255, 255, 0.94);
+}
+
 .lead-list {
   display: grid;
   gap: 8px;
@@ -403,6 +468,32 @@ p {
 .lead-card.hot,
 .lead-card.status-new {
   border-left-color: var(--rose);
+}
+
+#unclaimedLeads .lead-card.status-new {
+  animation: unclaimedPulse 1.9s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(229, 72, 123, 0.28);
+}
+
+@keyframes unclaimedPulse {
+  0% {
+    border-color: rgba(229, 72, 123, 0.28);
+    box-shadow: 0 0 0 0 rgba(229, 72, 123, 0.28);
+  }
+  58% {
+    border-color: rgba(229, 72, 123, 0.52);
+    box-shadow: 0 0 0 8px rgba(229, 72, 123, 0);
+  }
+  100% {
+    border-color: rgba(229, 72, 123, 0.28);
+    box-shadow: 0 0 0 0 rgba(229, 72, 123, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #unclaimedLeads .lead-card.status-new {
+    animation: none;
+  }
 }
 
 .lead-card.nurture {
@@ -656,8 +747,7 @@ p {
 
 .hot-task {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px 8px;
+  gap: 3px;
   align-items: center;
   border: 1px solid rgba(18, 56, 73, 0.1);
   border-left: 5px solid var(--gold);
@@ -678,27 +768,10 @@ p {
   font-size: 0.84rem;
 }
 
-.hot-task span,
-.hot-task em {
+.hot-task span {
   color: var(--muted);
   font-size: 0.74rem;
-  font-style: normal;
   font-weight: 850;
-}
-
-.hot-task button {
-  min-height: 24px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--teal);
-  color: white;
-  font-size: 0.72rem;
-  font-weight: 950;
-}
-
-.hot-task button {
-  grid-row: span 2;
-  padding: 0 8px;
 }
 
 .owner-pipeline {

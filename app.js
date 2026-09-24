@@ -696,9 +696,9 @@ function claimButtons(lead) {
   `).join("");
 }
 
-function metricCard(label, value, helper) {
+function metricCard(label, value, helper, accent = "teal") {
   return `
-    <article class="metric-card">
+    <article class="metric-card metric-${accent}">
       <span>${label}</span>
       <strong>${value}</strong>
       <span>${helper}</span>
@@ -714,11 +714,11 @@ function renderMetrics() {
   const hot = scope.filter((lead) => lead.urgency === "Hot" && lead.status !== "closed").length;
   const converted = scope.filter((lead) => lead.status === "converted").length;
   document.querySelector("#metricsGrid").innerHTML = [
-    metricCard("Unclaimed", unclaimed, "Needs response"),
-    metricCard("Claimed active", claimed, "Being worked"),
-    metricCard("Appointments", appointments, "Set from leads"),
-    metricCard("Hot leads", hot, "High priority"),
-    metricCard("Converted", converted, "Became clients"),
+    metricCard("Unclaimed", unclaimed, "Needs response", "rose"),
+    metricCard("Claimed active", claimed, "Being worked", "teal"),
+    metricCard("Appointments", appointments, "Set from leads", "green"),
+    metricCard("Hot leads", hot, "High priority", "gold"),
+    metricCard("Converted", converted, "Became clients", "blue"),
   ].join("");
 }
 
@@ -900,8 +900,6 @@ function renderHotTasks() {
     <article class="hot-task status-${lead.status}" data-open-lead="${lead.id}">
       <strong>${escapeHtml(lead.name)}</strong>
       <span>${escapeHtml(taskReason(lead))}</span>
-      <em>${Number(lead.contactAttempts || 0)} attempts</em>
-      <button type="button" data-attempt-lead="${lead.id}">+ Attempt</button>
     </article>
   `).join("") : emptyState("No hot tasks right now.");
 }
