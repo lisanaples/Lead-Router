@@ -148,6 +148,22 @@ function saveCloudSession(session) {
   renderSyncStatus();
 }
 
+function processAuthConfirmation() {
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  const accessToken = params.get("access_token");
+  if (!accessToken) return false;
+
+  saveCloudSession({
+    access_token: accessToken,
+    refresh_token: params.get("refresh_token") || "",
+    token_type: params.get("token_type") || "bearer",
+    expires_in: Number(params.get("expires_in") || 0),
+    expires_at: Number(params.get("expires_at") || 0),
+  });
+  window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+  return true;
+}
+
 function saveAll() {
   localStorage.setItem(LEADS_KEY, JSON.stringify(leads));
   localStorage.setItem(TEAM_KEY, JSON.stringify(team));
@@ -231,7 +247,8 @@ async function signIn(email, password) {
 }
 
 async function createAccount(email, password) {
-  const data = await supabaseRequest("/auth/v1/signup", {
+  const redirectTo = new URL(LEAD_RELAY_APP_URL).toString();
+  const data = await supabaseRequest(`/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -2186,8 +2203,10 @@ document.querySelector("#notifyAll").addEventListener("change", (event) => {
   saveAndSync();
 });
 
+const authConfirmationCompleted = processAuthConfirmation();
 renderAll();
 if (cloudSession?.access_token) refreshFromCloud({ silent: true });
+if (authConfirmationCompleted) showToast("Email confirmed. You are signed in to Lead Relay.");
 processClaimLink();
 checkForAppUpdate({ silent: true });
 window.setInterval(() => checkForAppUpdate({ silent: true }), 5 * 60 * 1000);
