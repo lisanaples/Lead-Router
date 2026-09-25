@@ -96,6 +96,7 @@ let leadFormAutoSaveTimer = null;
 let teamFormAutoSaveTimer = null;
 let syncState = "idle";
 let lastAutoSync = localStorage.getItem(LAST_AUTO_SYNC_KEY) || "";
+let passwordRecoveryMode = false;
 
 team = team.map((member) => ({
   ...member,
@@ -148,10 +149,17 @@ function saveCloudSession(session) {
   renderSyncStatus();
 }
 
-function processAuthConfirmation() {
+function processAuthCallback() {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
   const accessToken = params.get("access_token");
-  if (!accessToken) return false;
+  const errorDescription = params.get("error_description");
+  if (!accessToken) {
+    if (errorDescription) {
+      window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+      return { error: errorDescription };
+    }
+    return null;
+  }
 
   saveCloudSession({
     access_token: accessToken,
@@ -160,8 +168,9 @@ function processAuthConfirmation() {
     expires_in: Number(params.get("expires_in") || 0),
     expires_at: Number(params.get("expires_at") || 0),
   });
+  passwordRecoveryMode = params.get("type") === "recovery";
   window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
-  return true;
+  return { type: passwordRecoveryMode ? "recovery" : "confirmation" };
 }
 
 function saveAll() {
@@ -259,6 +268,28 @@ async function createAccount(email, password) {
   } else {
     showToast("Account created. Check your email if Supabase asks you to confirm it.");
   }
+}
+
+async function requestPasswordReset(email) {
+  const redirectTo = new URL(LEAD_RELAY_APP_URL).toString();
+  await supabaseRequest(`/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+  showToast("Password reset email sent. Check your inbox and spam folder.");
+}
+
+async function updatePassword(password) {
+  if (!cloudSession?.access_token || !passwordRecoveryMode) {
+    throw new Error("Open the newest password reset link from your email first.");
+  }
+  await supabaseRequest("/auth/v1/user", {
+    method: "PUT",
+    body: JSON.stringify({ password }),
+  });
+  passwordRecoveryMode = false;
+  renderAll();
+  showToast("Password updated. You are signed in to Lead Relay.");
 }
 
 async function refreshFromCloud(options = {}) {
@@ -1143,12 +1174,15 @@ function renderSyncStatus() {
   };
   const lastSavedText = lastAutoSync ? ` Last saved ${dateTimeLabel(lastAutoSync)}.` : "";
   document.querySelector("#syncStatus").textContent = signedIn ? syncLabels[syncState] || syncLabels.idle : "Local mode";
-  document.querySelector("#syncHelper").textContent = signedIn
+  document.querySelector("#syncHelper").textContent = passwordRecoveryMode
+    ? "Enter and save your new password below."
+    : signedIn
     ? `Changes save automatically.${lastSavedText} Use Refresh if another device changed leads.`
     : "Sign in to share leads and claims with the team.";
   document.querySelector("#authForm").classList.toggle("hidden", signedIn);
-  document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn);
-  document.querySelector("#refreshCloudButton").disabled = !signedIn;
+  document.querySelector("#passwordResetForm").classList.toggle("hidden", !passwordRecoveryMode);
+  document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn || passwordRecoveryMode);
+  document.querySelector("#refreshCloudButton").disabled = !signedIn || passwordRecoveryMode;
   document.querySelector("#enablePushButton").disabled = !pushAvailable || !myOwner;
   document.querySelector("#testPushButton").disabled = !pushAvailable || !myOwner;
 }
@@ -2183,6 +2217,37 @@ document.querySelector("#createAccountButton").addEventListener("click", async (
     showToast(`Account could not be created: ${error.message}`);
   }
 });
+document.querySelector("#forgotPasswordButton").addEventListener("click", async () => {
+  const email = document.querySelector("#authEmail").value.trim();
+  if (!email) {
+    showToast("Enter your email first, then choose Forgot password.");
+    return;
+  }
+  try {
+    await requestPasswordReset(email);
+  } catch (error) {
+    showToast(`Reset email could not be sent: ${error.message}`);
+  }
+});
+document.querySelector("#passwordResetForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const password = document.querySelector("#newPassword").value;
+  const confirmation = document.querySelector("#confirmNewPassword").value;
+  if (password.length < 8) {
+    showToast("Use a password with at least 8 characters.");
+    return;
+  }
+  if (password !== confirmation) {
+    showToast("The passwords do not match.");
+    return;
+  }
+  try {
+    await updatePassword(password);
+    event.target.reset();
+  } catch (error) {
+    showToast(`Password could not be updated: ${error.message}`);
+  }
+});
 document.querySelector("#refreshCloudButton").addEventListener("click", () => refreshFromCloud());
 document.querySelector("#enablePushButton").addEventListener("click", enablePushAlerts);
 document.querySelector("#testPushButton").addEventListener("click", sendTestPush);
@@ -2203,10 +2268,12 @@ document.querySelector("#notifyAll").addEventListener("change", (event) => {
   saveAndSync();
 });
 
-const authConfirmationCompleted = processAuthConfirmation();
+const authCallback = processAuthCallback();
 renderAll();
-if (cloudSession?.access_token) refreshFromCloud({ silent: true });
-if (authConfirmationCompleted) showToast("Email confirmed. You are signed in to Lead Relay.");
+if (cloudSession?.access_token && !passwordRecoveryMode) refreshFromCloud({ silent: true });
+if (authCallback?.type === "confirmation") showToast("Email confirmed. You are signed in to Lead Relay.");
+if (authCallback?.type === "recovery") showToast("Recovery link accepted. Choose a new password below.");
+if (authCallback?.error) showToast(`This sign-in link could not be used: ${authCallback.error}`);
 processClaimLink();
 checkForAppUpdate({ silent: true });
 window.setInterval(() => checkForAppUpdate({ silent: true }), 5 * 60 * 1000);

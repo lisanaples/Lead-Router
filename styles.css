@@ -229,6 +229,13 @@ button {
   min-height: 48px;
 }
 
+.auth-form-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--teal-dark);
+  font-weight: 700;
+}
+
 .auth-form button,
 .sync-actions button {
   min-width: 0;

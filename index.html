@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=41" />
+    <link rel="stylesheet" href="styles.css?v=43" />
   </head>
   <body>
     <main class="app-shell">
@@ -69,6 +69,13 @@
             <input id="authPassword" type="password" placeholder="Password" autocomplete="current-password" />
             <button class="primary-button" type="submit">Sign in</button>
             <button class="ghost-button" type="button" id="createAccountButton">Create account</button>
+            <button class="ghost-button" type="button" id="forgotPasswordButton">Forgot password?</button>
+          </form>
+          <form class="auth-form hidden" id="passwordResetForm">
+            <p class="auth-form-message">Choose a new password for your Lead Relay account.</p>
+            <input id="newPassword" type="password" placeholder="New password" autocomplete="new-password" minlength="8" required />
+            <input id="confirmNewPassword" type="password" placeholder="Confirm new password" autocomplete="new-password" minlength="8" required />
+            <button class="primary-button" type="submit">Save new password</button>
           </form>
           <div class="sync-actions">
             <button class="ghost-button" type="button" id="refreshCloudButton">Refresh cloud data</button>
@@ -502,7 +509,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=42"></script>
+    <script src="app.js?v=43"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
