@@ -323,6 +323,25 @@ async function notifyActiveTeam(workspace, lead) {
   return results;
 }
 
+function recordNotificationDelivery(lead, notifications, action = "Notifications sent") {
+  lead.notificationHistory = Array.isArray(lead.notificationHistory) ? lead.notificationHistory : [];
+  lead.notificationHistory.unshift({
+    at: new Date().toISOString(),
+    action,
+    recipients: notifications.map((entry) => ({
+      member: entry.member,
+      email: Boolean(entry.email),
+      push: Boolean(entry.push),
+      pushCount: Number(entry.pushCount || 0),
+      emailSkipped: entry.emailSkipped || "",
+      pushSkipped: entry.pushSkipped || "",
+      emailError: entry.emailError || "",
+      pushError: entry.pushError || "",
+    })),
+  });
+  lead.notificationHistory = lead.notificationHistory.slice(0, 20);
+}
+
 function claimLead(workspace, leadId, owner) {
   const leads = Array.isArray(workspace.leads) ? workspace.leads : [];
   const team = Array.isArray(workspace.team) ? workspace.team : [];
@@ -347,6 +366,7 @@ module.exports = {
   handleOptions,
   leadFromPayload,
   notifyActiveTeam,
+  recordNotificationDelivery,
   optionalEnv,
   parseBody,
   readBody,

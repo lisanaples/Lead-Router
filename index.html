@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=43" />
+    <link rel="stylesheet" href="styles.css?v=45" />
   </head>
   <body>
     <main class="app-shell">
@@ -461,6 +461,13 @@
             <button class="ghost-button" type="button" id="openEmailDraftButton">Open email</button>
           </div>
         </section>
+        <section class="tracking-section delivery-section">
+          <div class="section-title">
+            <h3>Notification delivery history</h3>
+            <span>Email and phone push</span>
+          </div>
+          <div class="delivery-history" id="deliveryHistory"></div>
+        </section>
         <div class="dialog-actions">
           <button class="danger-button hidden" type="button" id="archiveLeadButton">Archive lead</button>
           <button class="ghost-button hidden" type="button" id="resendLeadButton">Resend notifications</button>
@@ -510,7 +517,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=44"></script>
+    <script src="app.js?v=45"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

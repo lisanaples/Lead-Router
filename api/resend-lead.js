@@ -2,6 +2,7 @@ const {
   getWorkspace,
   handleOptions,
   notifyActiveTeam,
+  recordNotificationDelivery,
   parseBody,
   readBody,
   saveWorkspace,
@@ -28,6 +29,7 @@ module.exports = async function handler(request, response) {
     }
 
     const notifications = await notifyActiveTeam(workspace, lead);
+    recordNotificationDelivery(lead, notifications, "Notifications resent");
     const summary = {
       eligible: notifications.length,
       emailsSent: notifications.filter((entry) => entry.email).length,

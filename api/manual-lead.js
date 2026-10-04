@@ -3,6 +3,7 @@ const {
   handleOptions,
   leadFromPayload,
   notifyActiveTeam,
+  recordNotificationDelivery,
   parseBody,
   readBody,
   saveWorkspace,
@@ -33,6 +34,7 @@ module.exports = async function handler(request, response) {
     });
     workspace.leads.unshift(lead);
     const notifications = await notifyActiveTeam(workspace, lead);
+    recordNotificationDelivery(lead, notifications, "Initial lead notification");
     lead.activity.unshift({
       at: new Date().toISOString(),
       text: `Email/push notification attempted for ${notifications.length} team member(s).`,

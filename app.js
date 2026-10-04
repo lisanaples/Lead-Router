@@ -1237,6 +1237,7 @@ function fillLeadForm(lead = {}) {
   form.elements.message.value = lead.message || "";
   document.querySelector("#leadNoteText").value = "";
   renderLeadNotes(lead);
+  renderDeliveryHistory(lead);
   document.querySelector("#engagementDraft").value = "";
 }
 
@@ -1248,6 +1249,36 @@ function renderLeadNotes(lead = {}) {
       <p>${escapeHtml(note.text)}</p>
     </article>
   `).join("") : emptyState("No notes yet.");
+}
+
+function deliveryStatus(label, delivered, detail) {
+  const state = delivered ? "delivered" : detail && !/not configured|not enabled/i.test(detail) ? "failed" : "not-enabled";
+  const text = delivered ? `${label}: Delivered${detail ? ` (${detail})` : ""}` : `${label}: ${detail || "Not delivered"}`;
+  return `<span class="delivery-status ${state}">${escapeHtml(text)}</span>`;
+}
+
+function renderDeliveryHistory(lead = {}) {
+  const history = Array.isArray(lead.notificationHistory) ? lead.notificationHistory : [];
+  document.querySelector("#deliveryHistory").innerHTML = history.length ? history.map((delivery) => {
+    const recipients = Array.isArray(delivery.recipients) ? delivery.recipients : [];
+    return `
+      <article class="delivery-entry">
+        <div class="delivery-heading">
+          <strong>${escapeHtml(delivery.action || "Notifications sent")}</strong>
+          <span>${dateTimeLabel(delivery.at)}</span>
+        </div>
+        ${recipients.length ? recipients.map((recipient) => `
+          <div class="delivery-recipient">
+            <strong>${escapeHtml(recipient.member || "Team member")}</strong>
+            <div>
+              ${deliveryStatus("Email", recipient.email, recipient.emailError || recipient.emailSkipped)}
+              ${deliveryStatus("Phone push", recipient.push, recipient.pushError || recipient.pushSkipped || (recipient.pushCount ? `${recipient.pushCount} device(s)` : ""))}
+            </div>
+          </div>
+        `).join("") : `<p>No eligible team members were found for this send.</p>`}
+      </article>
+    `;
+  }).join("") : emptyState("No detailed delivery history yet. Use Resend notifications to create one for this lead.");
 }
 
 function openLeadDialog(lead) {

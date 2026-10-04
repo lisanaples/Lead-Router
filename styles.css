@@ -929,6 +929,63 @@ p {
   overflow-wrap: anywhere;
 }
 
+.delivery-history {
+  display: grid;
+  gap: 10px;
+}
+
+.delivery-entry {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(245, 248, 248, 0.72);
+}
+
+.delivery-heading,
+.delivery-recipient {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px;
+}
+
+.delivery-heading {
+  background: rgba(18, 56, 73, 0.06);
+  color: var(--teal-dark);
+  font-size: 0.8rem;
+}
+
+.delivery-recipient {
+  align-items: center;
+  border-top: 1px solid var(--line);
+}
+
+.delivery-recipient > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.delivery-status {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+}
+
+.delivery-status.delivered {
+  background: rgba(31, 157, 102, 0.14);
+  color: #176d4a;
+}
+
+.delivery-status.failed {
+  background: rgba(190, 55, 55, 0.12);
+  color: #9b2f2f;
+}
+
 .report-card h3 {
   margin: 0;
   font-size: 0.96rem;
