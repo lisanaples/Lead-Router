@@ -1256,7 +1256,40 @@ function openLeadDialog(lead) {
   document.querySelector("#leadDialogTitle").textContent = lead ? "Edit Lead" : "Add Lead";
   document.querySelector("#archiveLeadButton").classList.toggle("hidden", !lead);
   document.querySelector("#archiveLeadButton").dataset.archiveLead = lead?.id || "";
+  document.querySelector("#resendLeadButton").classList.toggle("hidden", !lead);
+  document.querySelector("#resendLeadButton").dataset.resendLead = lead?.id || "";
   document.querySelector("#leadDialog").showModal();
+}
+
+async function resendLeadNotifications(leadId) {
+  const button = document.querySelector("#resendLeadButton");
+  if (!leadId || button.disabled) return;
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Resending...";
+  try {
+    const result = await authenticatedAppApiRequest("/api/resend-lead", {
+      method: "POST",
+      body: JSON.stringify({ leadId }),
+    });
+    await refreshFromCloud({ silent: true });
+    const refreshedLead = leads.find((lead) => String(lead.id) === String(leadId));
+    if (refreshedLead) fillLeadForm(refreshedLead);
+    showToast(`Resent. ${notificationDeliveryText(result.notifications || [])}`);
+  } catch (error) {
+    showToast(`Notifications could not be resent: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
+function notificationDeliveryText(notifications = []) {
+  const emailsSent = notifications.filter((entry) => entry.email).length;
+  const pushesSent = notifications.reduce((total, entry) => total + Number(entry.pushCount || (entry.push ? 1 : 0)), 0);
+  const pushNotEnabled = notifications.filter((entry) => entry.pushSkipped).map((entry) => entry.member);
+  const missing = pushNotEnabled.length ? ` Push not enabled for: ${pushNotEnabled.join(", ")}.` : "";
+  return `${notifications.length} eligible team member(s); ${emailsSent} email(s) and ${pushesSent} phone push(es) delivered.${missing}`;
 }
 
 function currentLeadFromForm() {
@@ -1773,8 +1806,7 @@ async function createParsedLeadAndNotify() {
     document.querySelector("#createParsedLeadButton").classList.add("hidden");
     parsedLeadDraft = null;
     switchView("dashboard");
-    const pushed = (result.notifications || []).filter((entry) => entry.push).length;
-    showToast(`Lead created. Push sent to ${pushed} team member(s).`);
+    showToast(`Lead created. ${notificationDeliveryText(result.notifications || [])}`);
   } catch (error) {
     showToast(`Create failed: ${error.message}`);
   }
@@ -2136,6 +2168,9 @@ document.querySelector("#leadForm").addEventListener("submit", (event) => {
 document.querySelector("#leadForm").addEventListener("input", scheduleLeadFormAutoSave);
 document.querySelector("#leadForm").addEventListener("change", scheduleLeadFormAutoSave);
 document.querySelector("#addLeadNoteButton").addEventListener("click", addLeadNote);
+document.querySelector("#resendLeadButton").addEventListener("click", (event) => {
+  resendLeadNotifications(event.currentTarget.dataset.resendLead);
+});
 document.querySelector("#copyDraftButton").addEventListener("click", copyEngagementDraft);
 document.querySelector("#openEmailDraftButton").addEventListener("click", openEmailDraft);
 
