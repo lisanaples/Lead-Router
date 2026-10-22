@@ -107,7 +107,7 @@ function lineValueAfterLabel(lines, labels) {
 
 function extractLeadName(lines) {
   const conversationalText = lines.map(plainLeadLine).join(" ").replace(/\s+/g, " ");
-  const leadingName = conversationalText.match(/^([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){1,4}),\s+(?=I\b|I['’](?:m|ve|d|ll)\b|my\b)/i)?.[1] || "";
+  const leadingName = conversationalText.match(/^([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){1,4}),\s+(?=I\b|I['’](?:m|ve|d|ll)\b|my\b|looking\b|interested\b|wants?\b|needs?\b|asking\b|inquiring\b|would like\b)/i)?.[1] || "";
   if (leadingName) return formatContactName(leadingName);
   const statedName = conversationalText.match(/\bmy name is\s+(.+?)(?=\s+and\s+my\b|[.!?](?:\s|$)|$)/i)?.[1] || "";
   if (statedName) return formatContactName(statedName);
