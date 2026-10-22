@@ -106,6 +106,10 @@ function lineValueAfterLabel(lines, labels) {
 }
 
 function extractLeadName(lines) {
+  const conversationalName = lines.map(plainLeadLine).map((line) => (
+    line.match(/\bmy name is\s+(.+?)(?=\s+and\s+my\b|[.!?](?:\s|$)|$)/i)?.[1] || ""
+  )).find(Boolean);
+  if (conversationalName) return formatContactName(conversationalName);
   const submittedIndex = lines.findIndex((line) => /^submitted on\b/i.test(plainLeadLine(line)));
   if (submittedIndex >= 0) {
     const submittedName = lines.slice(submittedIndex + 1).find((line) => {
