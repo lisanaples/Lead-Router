@@ -13,6 +13,11 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Supports editable team members with statuses: Available, On call, Backup only, Paused, Out of office, and Admin only.
 - Imports lead CSV files exported from FiveStreet.
 - Assigns imported leads to matching team members when the CSV has an owner/agent field.
+- Can assign an entire FiveStreet CSV upload to one selected team member.
+- Recognizes repeat leads by matching email address or phone number against existing and imported leads.
+- Routes repeat inquiries only to the team member who already owns the matching lead and labels the notification as a repeat lead.
+- Extracts Facebook campaign lead names and property/area values without copying the surrounding email sentence or campaign-volume label.
+- Uses a darker, richer dashboard palette with lead names as the main tile element and dashboard lists sorted from hot to cold.
 - Downloads lead CSV files by owner/team member.
 - Shows an owner workflow with daily contacts and a hot-to-cold pipeline.
 - Adds a My Leads view for the selected team member.

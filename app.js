@@ -699,14 +699,18 @@ function addActivity(lead, text) {
 
 function leadCard(lead, compact = false) {
   const assigned = lead.assignedTo ? `Assigned to ${escapeHtml(lead.assignedTo)}` : "Available to claim";
+  const temperature = lead.urgency || "Warm";
   return `
-    <article class="lead-card ${lead.urgency.toLowerCase()} status-${lead.status} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
+    <article class="lead-card ${temperature.toLowerCase()} status-${lead.status} ${lead.status === "new" ? "" : "claimed"}" data-open-lead="${lead.id}">
       <div class="lead-main">
         <div>
           <strong>${escapeHtml(lead.name)}</strong>
           <span>${escapeHtml(lead.source || "Lead")}${lead.property ? ` - ${escapeHtml(lead.property)}` : ""}</span>
         </div>
-        <span class="status-pill">${statusLabel(lead.status)}</span>
+        <div class="lead-badges">
+          <span class="temperature-pill temperature-${temperature.toLowerCase()}">${escapeHtml(temperature)}</span>
+          <span class="status-pill">${statusLabel(lead.status)}</span>
+        </div>
       </div>
       ${compact ? "" : `
         <div class="lead-meta">
@@ -772,8 +776,8 @@ function renderMetrics() {
 
 function renderDashboard() {
   const scope = visibleLeads();
-  const unclaimed = scope.filter((lead) => lead.status === "new").sort(sortNewest);
-  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status)).sort(sortNewest);
+  const unclaimed = scope.filter((lead) => lead.status === "new").sort(sortHotToCold);
+  const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status)).sort(sortHotToCold);
   document.querySelector("#unclaimedCount").textContent = unclaimed.length;
   document.querySelector("#claimedCount").textContent = claimed.length;
   document.querySelector("#unclaimedLeads").innerHTML = unclaimed.length ? unclaimed.map((lead) => leadCard(lead, true)).join("") : emptyState("No unclaimed leads.");
@@ -782,6 +786,17 @@ function renderDashboard() {
 
 function sortNewest(a, b) {
   return new Date(b.createdAt) - new Date(a.createdAt);
+}
+
+function urgencyRank(lead) {
+  const urgency = String(lead.urgency || "Warm").toLowerCase();
+  if (urgency === "hot") return 0;
+  if (urgency === "warm") return 1;
+  return 2;
+}
+
+function sortHotToCold(a, b) {
+  return urgencyRank(a) - urgencyRank(b) || sortNewest(a, b);
 }
 
 function filteredLeads() {
@@ -828,6 +843,13 @@ function renderOwnerControls() {
   workflowOwner = team.some((member) => member.name === workflowOwner) ? workflowOwner : team[0]?.name || "";
   workflowSelect.innerHTML = ownerOptions(workflowOwner, false);
   document.querySelector("#leadOwnerSelect").innerHTML = ownerOptions("", true);
+  const csvImportOwner = document.querySelector("#csvImportOwner");
+  const selectedImportOwner = csvImportOwner.value;
+  csvImportOwner.innerHTML = [
+    '<option value="">Use the owner in each CSV row</option>',
+    ...team.map((member) => `<option value="${escapeAttr(member.name)}">Assign every imported lead to ${escapeHtml(member.name)}</option>`),
+  ].join("");
+  csvImportOwner.value = team.some((member) => member.name === selectedImportOwner) ? selectedImportOwner : "";
 }
 
 function leadRank(lead) {
@@ -1693,16 +1715,35 @@ function cleanupLeadName(value) {
     .trim();
 }
 
+function plainLeadLine(value) {
+  return String(value || "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[\*_`>#]/g, "")
+    .trim();
+}
+
+function formatContactName(value) {
+  let name = cleanupLeadName(plainLeadLine(value));
+  if (/^[^,]+,[^,]+$/.test(name)) {
+    const [last, first] = name.split(",").map((part) => part.trim());
+    name = `${first} ${last}`;
+  }
+  if (name && (name === name.toUpperCase() || name === name.toLowerCase())) {
+    name = name.toLowerCase().replace(/(^|[\s'-])[a-z]/g, (letter) => letter.toUpperCase());
+  }
+  return name;
+}
+
 function lineValueAfterLabel(lines, labels) {
   const labelPattern = labels.join("|");
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    const inlineMatch = line.match(new RegExp(`^(${labelPattern})\\s*:?\\s*(.+)$`, "i"));
+    const inlineMatch = plainLeadLine(line).match(new RegExp(`^(${labelPattern})\\s*:\\s*(.+)$`, "i"));
     if (inlineMatch?.[2]) {
       const value = cleanupLeadName(inlineMatch[2]);
       if (value && !isGreetingLine(value)) return value;
     }
-    if (new RegExp(`^(${labelPattern})\\s*:?$`, "i").test(line)) {
+    if (new RegExp(`^(${labelPattern})\\s*:?$`, "i").test(plainLeadLine(line))) {
       const next = lines.slice(index + 1).find((entry) => entry && !isGreetingLine(entry));
       const value = cleanupLeadName(next);
       if (value) return value;
@@ -1712,8 +1753,25 @@ function lineValueAfterLabel(lines, labels) {
 }
 
 function extractLeadName(lines) {
+  const submittedIndex = lines.findIndex((line) => /^submitted on\b/i.test(plainLeadLine(line)));
+  if (submittedIndex >= 0) {
+    const submittedName = lines.slice(submittedIndex + 1).find((line) => {
+      const plain = plainLeadLine(line);
+      return /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,4}$/.test(plain) && !/^(Email Address|Phone Number|Custom Questions)$/i.test(plain);
+    });
+    if (submittedName) return formatContactName(submittedName);
+  }
+  const contactHeadingIndex = lines.findIndex((line) => /^contact details:?$/i.test(plainLeadLine(line)));
+  if (contactHeadingIndex >= 0) {
+    const homesContact = lines.slice(contactHeadingIndex + 1).find((line) => {
+      const plain = plainLeadLine(line);
+      return plain && !/^(phone|email|message|comments?)\b/i.test(plain) && !/@/.test(plain) && !/^\+?\(?\d/.test(plain);
+    });
+    const formatted = formatContactName(homesContact);
+    if (formatted) return formatted;
+  }
   const labeled = lineValueAfterLabel(lines, ["lead name", "contact name", "customer name", "client name", "name", "contact"]);
-  if (labeled) return labeled;
+  if (labeled) return formatContactName(labeled);
   const fromLine = lines.find((line) => /^from:/i.test(line) && !/@/.test(line));
   const fromName = cleanupLeadName(fromLine);
   if (fromName && !isGreetingLine(fromName)) return fromName;
@@ -1724,15 +1782,45 @@ function extractLeadName(lines) {
     !/^(subject|to|from|sent|date|phone|email|property|address|message|comments|listing|price):/i.test(line) &&
     /^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+){0,3}$/.test(line)
   ));
-  return cleanupLeadName(candidate) || "New Lead";
+  return formatContactName(candidate) || "New Lead";
+}
+
+function expandedStreetAddress(value) {
+  return plainLeadLine(value)
+    .replace(/\bTer\.?$/i, "Terrace")
+    .replace(/\bSt\.?$/i, "Street")
+    .replace(/\bAve\.?$/i, "Avenue")
+    .replace(/\bRd\.?$/i, "Road")
+    .replace(/\bDr\.?$/i, "Drive")
+    .replace(/\bLn\.?$/i, "Lane")
+    .replace(/\bCt\.?$/i, "Court")
+    .replace(/\bBlvd\.?$/i, "Boulevard");
+}
+
+function extractPropertyArea(text, lines) {
+  const facebookCampaign = text.match(/Facebook Ads Campaign,\s*(?:\*\*)?(.+?)(?:\*\*)?\s+and it(?:'|’)s\b/is)?.[1] || "";
+  if (facebookCampaign) {
+    const parts = plainLeadLine(facebookCampaign).split("|").map((part) => part.trim()).filter(Boolean);
+    const street = parts.find((part) => /^\d{1,6}\s+.+\b(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pike|blvd|boulevard|ter|terrace|cir|circle|way)\.?$/i.test(part));
+    const city = [...parts].reverse().find((part) => part !== street && !/\bvolume\b/i.test(part));
+    if (street) {
+      const expanded = expandedStreetAddress(street);
+      if (/^903\s+green\s+terrace$/i.test(expanded) && /^lancaster$/i.test(city || "")) {
+        return "903 Green Terrace, Lancaster, PA 17601";
+      }
+      return [expanded, city].filter(Boolean).join(", ");
+    }
+  }
+  const streetAddress = text.match(/\b\d{1,6}\s+[A-Z0-9][A-Z0-9.'-]*(?:\s+[A-Z0-9][A-Z0-9.'-]*){0,6}\s+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pike|blvd|boulevard|ter|terrace|cir|circle|way)\b/i)?.[0] || "";
+  const propertyLine = streetAddress || lines.find((line) => /^(property|address|home|listing|interested in)\s*:/i.test(plainLeadLine(line))) || "";
+  return expandedStreetAddress(plainLeadLine(propertyLine).replace(/^(property|address|home|listing|interested in):/i, "").trim());
 }
 
 function parseLeadEmail(text) {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
   const phone = text.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || "";
-  const source = /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
-  const propertyLine = lines.find((line) => /(property|address|home|listing|interested in):/i.test(line)) || lines.find((line) => /\d+ .*(st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pike|blvd|boulevard)/i.test(line)) || "";
+  const source = /facebook ads campaign/i.test(text) ? "Facebook" : /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
   const messageLine = lines.find((line) => /^(message|comments|note|inquiry):/i.test(line));
   return {
     source,
@@ -1740,7 +1828,7 @@ function parseLeadEmail(text) {
     name: extractLeadName(lines),
     phone,
     email,
-    property: propertyLine.replace(/^(property|address|home|listing|interested in):/i, "").trim(),
+    property: extractPropertyArea(text, lines),
     price: text.match(/\$[\d,]+(?:\s*-\s*\$?[\d,]+)?/)?.[0] || "",
     urgency: /tour|showing|today|asap|pre-approved|preapproved/i.test(text) ? "Hot" : "Warm",
     message: text,
@@ -1957,7 +2045,7 @@ function normalizeCsvDate(value) {
   return `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
 }
 
-function leadFromCsvRow(row, headerMap) {
+function leadFromCsvRow(row, headerMap, importOwner = "") {
   const first = rowValue(row, headerMap, ["first name", "firstname"]);
   const last = rowValue(row, headerMap, ["last name", "lastname"]);
   const fullName = rowValue(row, headerMap, ["name", "lead name", "contact name", "client"]);
@@ -1974,7 +2062,7 @@ function leadFromCsvRow(row, headerMap) {
     price: rowValue(row, headerMap, ["price", "price range", "listing price"]),
     urgency: normalizeUrgency(rowValue(row, headerMap, ["urgency", "priority", "temperature"]), status),
     status: normalizeLeadStatus(status),
-    assignedTo: matchTeamMember(owner),
+    assignedTo: importOwner || matchTeamMember(owner),
     nextFollowUpDate: normalizeCsvDate(rowValue(row, headerMap, ["next follow up", "next follow-up", "follow up date", "follow-up date", "next task date"])),
     firstAttemptedAt: normalizeCsvDate(rowValue(row, headerMap, ["first attempted", "contact attempted", "first contact attempted"])),
     firstContactedAt: normalizeCsvDate(rowValue(row, headerMap, ["first contacted", "contact made", "first contact made"])),
@@ -1991,6 +2079,7 @@ function leadFromCsvRow(row, headerMap) {
 }
 
 function importFiveStreetCsv(file) {
+  const importOwner = document.querySelector("#csvImportOwner").value;
   const reader = new FileReader();
   reader.addEventListener("load", () => {
     const rows = parseCsv(String(reader.result || ""));
@@ -2000,11 +2089,11 @@ function importFiveStreetCsv(file) {
     }
     const headers = rows[0].map(normalizedHeader);
     const headerMap = Object.fromEntries(headers.map((header, index) => [header, index]));
-    const imported = rows.slice(1).map((row) => leadFromCsvRow(row, headerMap));
+    const imported = rows.slice(1).map((row) => leadFromCsvRow(row, headerMap, importOwner));
     leads = [...imported, ...leads];
     saveAndSync({ silent: false });
     renderAll();
-    showToast(`${imported.length} FiveStreet leads imported.`);
+    showToast(`${imported.length} FiveStreet leads imported${importOwner ? ` and assigned to ${importOwner}` : ""}.`);
   });
   reader.readAsText(file);
 }

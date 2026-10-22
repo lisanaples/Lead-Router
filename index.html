@@ -91,6 +91,7 @@
                 <div>
                   <span class="eyebrow">Now</span>
                   <h2>Unclaimed Leads</h2>
+                  <p>Highest priority first</p>
                 </div>
                 <span class="count-pill" id="unclaimedCount">0</span>
               </div>
@@ -102,6 +103,7 @@
                 <div>
                   <span class="eyebrow">Assigned</span>
                   <h2>Claimed Leads</h2>
+                  <p>Hot to cold</p>
                 </div>
                 <span class="count-pill" id="claimedCount">0</span>
               </div>
@@ -327,6 +329,11 @@
             <div class="settings-card">
               <strong>Data tools</strong>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
+              <label class="master-only">Assign FiveStreet import to
+                <select id="csvImportOwner">
+                  <option value="">Use the owner in each CSV row</option>
+                </select>
+              </label>
               <div class="setup-actions">
                 <button class="ghost-button small-button" type="button" id="exportButton">Export backup</button>
                 <label class="import-button small-button">
@@ -517,7 +524,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=45"></script>
+    <script src="app.js?v=49"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

@@ -1,9 +1,9 @@
-const CACHE_NAME = "lead-router-v45";
+const CACHE_NAME = "lead-router-v49";
 const APP_SHELL = [
   "./",
   "index.html",
-  "styles.css?v=45",
-  "app.js?v=45",
+  "styles.css?v=49",
+  "app.js?v=49",
   "assets/lead-router-icon.svg",
   "manifest.webmanifest"
 ];

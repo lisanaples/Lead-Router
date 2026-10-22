@@ -2,6 +2,7 @@ const {
   getWorkspace,
   handleOptions,
   leadFromPayload,
+  routeRepeatLead,
   notifyActiveTeam,
   recordNotificationDelivery,
   parseBody,
@@ -47,16 +48,19 @@ module.exports = async function handler(request, response) {
     workspace.settings = workspace.settings || {};
 
     const lead = leadFromPayload(payload);
+    const previousLead = routeRepeatLead(workspace, lead);
     workspace.leads.unshift(lead);
     const notifications = await notifyActiveTeam(workspace, lead);
     recordNotificationDelivery(lead, notifications, "Automatic lead notification");
     lead.activity.unshift({
       at: new Date().toISOString(),
-      text: `Email/push notification attempted for ${notifications.length} team member(s).`,
+      text: previousLead
+        ? `Repeat-lead notification attempted only for ${lead.assignedTo}.`
+        : `Email/push notification attempted for ${notifications.length} team member(s).`,
     });
 
     await saveWorkspace(workspace);
-    response.status(200).json({ ok: true, leadId: lead.id, notifications });
+    response.status(200).json({ ok: true, leadId: lead.id, repeatLead: Boolean(previousLead), assignedTo: lead.assignedTo, notifications });
   } catch (error) {
     response.status(500).json({ ok: false, error: error.message });
   }

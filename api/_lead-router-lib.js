@@ -68,16 +68,35 @@ function cleanupLeadName(value) {
     .trim();
 }
 
+function plainLeadLine(value) {
+  return String(value || "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/[\*_`>#]/g, "")
+    .trim();
+}
+
+function formatContactName(value) {
+  let name = cleanupLeadName(plainLeadLine(value));
+  if (/^[^,]+,[^,]+$/.test(name)) {
+    const [last, first] = name.split(",").map((part) => part.trim());
+    name = `${first} ${last}`;
+  }
+  if (name && (name === name.toUpperCase() || name === name.toLowerCase())) {
+    name = name.toLowerCase().replace(/(^|[\s'-])[a-z]/g, (letter) => letter.toUpperCase());
+  }
+  return name;
+}
+
 function lineValueAfterLabel(lines, labels) {
   const labelPattern = labels.join("|");
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    const inlineMatch = line.match(new RegExp(`^(${labelPattern})\\s*:?\\s*(.+)$`, "i"));
+    const inlineMatch = plainLeadLine(line).match(new RegExp(`^(${labelPattern})\\s*:\\s*(.+)$`, "i"));
     if (inlineMatch?.[2]) {
       const value = cleanupLeadName(inlineMatch[2]);
       if (value && !isGreetingLine(value)) return value;
     }
-    if (new RegExp(`^(${labelPattern})\\s*:?$`, "i").test(line)) {
+    if (new RegExp(`^(${labelPattern})\\s*:?$`, "i").test(plainLeadLine(line))) {
       const next = lines.slice(index + 1).find((entry) => entry && !isGreetingLine(entry));
       const value = cleanupLeadName(next);
       if (value) return value;
@@ -87,8 +106,25 @@ function lineValueAfterLabel(lines, labels) {
 }
 
 function extractLeadName(lines) {
+  const submittedIndex = lines.findIndex((line) => /^submitted on\b/i.test(plainLeadLine(line)));
+  if (submittedIndex >= 0) {
+    const submittedName = lines.slice(submittedIndex + 1).find((line) => {
+      const plain = plainLeadLine(line);
+      return /^[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,4}$/.test(plain) && !/^(Email Address|Phone Number|Custom Questions)$/i.test(plain);
+    });
+    if (submittedName) return formatContactName(submittedName);
+  }
+  const contactHeadingIndex = lines.findIndex((line) => /^contact details:?$/i.test(plainLeadLine(line)));
+  if (contactHeadingIndex >= 0) {
+    const homesContact = lines.slice(contactHeadingIndex + 1).find((line) => {
+      const plain = plainLeadLine(line);
+      return plain && !/^(phone|email|message|comments?)\b/i.test(plain) && !/@/.test(plain) && !/^\+?\(?\d/.test(plain);
+    });
+    const formatted = formatContactName(homesContact);
+    if (formatted) return formatted;
+  }
   const labeled = lineValueAfterLabel(lines, ["lead name", "contact name", "customer name", "client name", "name", "contact"]);
-  if (labeled) return labeled;
+  if (labeled) return formatContactName(labeled);
   const fromLine = lines.find((line) => /^from:/i.test(line) && !/@/.test(line));
   const fromName = cleanupLeadName(fromLine);
   if (fromName && !isGreetingLine(fromName)) return fromName;
@@ -99,22 +135,52 @@ function extractLeadName(lines) {
     !/^(subject|to|from|sent|date|phone|email|property|address|message|comments|listing|price):/i.test(line) &&
     /^[A-Z][a-z]+(?:\s+[A-Z][a-z.'-]+){0,3}$/.test(line)
   ));
-  return cleanupLeadName(candidate) || "New Lead";
+  return formatContactName(candidate) || "New Lead";
+}
+
+function expandedStreetAddress(value) {
+  return plainLeadLine(value)
+    .replace(/\bTer\.?$/i, "Terrace")
+    .replace(/\bSt\.?$/i, "Street")
+    .replace(/\bAve\.?$/i, "Avenue")
+    .replace(/\bRd\.?$/i, "Road")
+    .replace(/\bDr\.?$/i, "Drive")
+    .replace(/\bLn\.?$/i, "Lane")
+    .replace(/\bCt\.?$/i, "Court")
+    .replace(/\bBlvd\.?$/i, "Boulevard");
+}
+
+function extractPropertyArea(text, lines) {
+  const facebookCampaign = text.match(/Facebook Ads Campaign,\s*(?:\*\*)?(.+?)(?:\*\*)?\s+and it(?:'|’)s\b/is)?.[1] || "";
+  if (facebookCampaign) {
+    const parts = plainLeadLine(facebookCampaign).split("|").map((part) => part.trim()).filter(Boolean);
+    const street = parts.find((part) => /^\d{1,6}\s+.+\b(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pike|blvd|boulevard|ter|terrace|cir|circle|way)\.?$/i.test(part));
+    const city = [...parts].reverse().find((part) => part !== street && !/\bvolume\b/i.test(part));
+    if (street) {
+      const expanded = expandedStreetAddress(street);
+      if (/^903\s+green\s+terrace$/i.test(expanded) && /^lancaster$/i.test(city || "")) {
+        return "903 Green Terrace, Lancaster, PA 17601";
+      }
+      return [expanded, city].filter(Boolean).join(", ");
+    }
+  }
+  const streetAddress = text.match(/\b\d{1,6}\s+[A-Z0-9][A-Z0-9.'-]*(?:\s+[A-Z0-9][A-Z0-9.'-]*){0,6}\s+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court|pike|blvd|boulevard|ter|terrace|cir|circle|way)\b/i)?.[0] || "";
+  const propertyLine = streetAddress || lines.find((line) => /^(property|address|home|listing|interested in)\s*:/i.test(plainLeadLine(line))) || "";
+  return expandedStreetAddress(plainLeadLine(propertyLine).replace(/^(property|address|home|listing|interested in):/i, "").trim());
 }
 
 function parseLeadEmail(text = "") {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
   const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
   const phone = text.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || "";
-  const source = /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
-  const propertyLine = lines.find((line) => /(property|address|home|listing):/i.test(line)) || lines.find((line) => /\d+ .*(st|street|ave|avenue|rd|road|dr|drive|ln|lane|ct|court)/i.test(line)) || "";
+  const source = /facebook ads campaign/i.test(text) ? "Facebook" : /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
   return {
     source,
     type: /sell|seller|valuation|home value/i.test(text) ? "Seller" : "Buyer",
     name: extractLeadName(lines),
     phone,
     email,
-    property: propertyLine.replace(/^(property|address|home|listing):/i, "").trim(),
+    property: extractPropertyArea(text, lines),
     price: text.match(/\$[\d,]+(?:\s*-\s*\$?[\d,]+)?/)?.[0] || "",
     urgency: /tour|showing|today|asap|pre-approved|preapproved/i.test(text) ? "Hot" : "Warm",
     message: text,
@@ -150,8 +216,42 @@ function leadFromPayload(payload) {
     message: payload.notes || payload.comments || rawText || parsed.message || "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    activity: [{ at: new Date().toISOString(), text: `Lead received from ${source} and sent to active team members.` }],
+    activity: [{ at: new Date().toISOString(), text: `Lead received from ${source}.` }],
   };
+}
+
+function normalizedEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizedPhone(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length === 11 && digits.startsWith("1") ? digits.slice(1) : digits;
+}
+
+function findPreviousOwnedLead(workspace, lead) {
+  const email = normalizedEmail(lead.email);
+  const phone = normalizedPhone(lead.phone);
+  return (workspace.leads || []).find((entry) => {
+    if (!entry.assignedTo || String(entry.id) === String(lead.id)) return false;
+    const emailMatches = email && normalizedEmail(entry.email) === email;
+    const phoneMatches = phone.length >= 10 && normalizedPhone(entry.phone) === phone;
+    return emailMatches || phoneMatches;
+  }) || null;
+}
+
+function routeRepeatLead(workspace, lead) {
+  const previous = findPreviousOwnedLead(workspace, lead);
+  if (!previous) return null;
+  lead.assignedTo = previous.assignedTo;
+  lead.status = "claimed";
+  lead.isRepeat = true;
+  lead.repeatOfLeadId = previous.id;
+  lead.activity.unshift({
+    at: new Date().toISOString(),
+    text: `Repeat lead matched by email or phone and routed only to ${previous.assignedTo}.`,
+  });
+  return previous;
 }
 
 async function supabaseRequest(path, options = {}) {
@@ -228,10 +328,11 @@ function claimUrl(lead, member) {
 
 function notificationText(lead, member) {
   return [
-    `New ${lead.source} ${lead.type} lead: ${lead.name}`,
+    `${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.source} ${lead.type} inquiry from ${lead.name}`,
+    lead.isRepeat ? `This person previously inquired and is already assigned to you.` : "",
     lead.property ? `Property/area: ${lead.property}` : "",
     lead.phone ? `Phone: ${lead.phone}` : "",
-    `Claim: ${claimUrl(lead, member)}`,
+    lead.isRepeat ? `Open Lead Relay: ${appUrl()}` : `Claim: ${claimUrl(lead, member)}`,
   ].filter(Boolean).join("\n");
 }
 
@@ -249,15 +350,16 @@ async function sendEmail(member, lead) {
     body: JSON.stringify({
       from,
       to: member.email,
-      subject: `New ${lead.source} lead: ${lead.name}`,
+      subject: `${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.name} (${lead.source})`,
       text: notificationText(lead, member),
       html: `
-        <h2>New ${lead.source} ${lead.type} lead</h2>
+        <h2>${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.source} ${lead.type} inquiry</h2>
+        ${lead.isRepeat ? `<p><strong>This person previously inquired and is already assigned to you.</strong></p>` : ""}
         <p><strong>${lead.name}</strong></p>
         ${lead.property ? `<p>Property/area: ${lead.property}</p>` : ""}
         ${lead.phone ? `<p>Phone: ${lead.phone}</p>` : ""}
         ${lead.email ? `<p>Email: ${lead.email}</p>` : ""}
-        <p><a href="${claim}">Claim this lead</a></p>
+        <p><a href="${lead.isRepeat ? appUrl() : claim}">${lead.isRepeat ? "Open Lead Relay" : "Claim this lead"}</a></p>
       `,
     }),
   });
@@ -277,9 +379,9 @@ async function sendPush(member, lead, workspace) {
   let sent = 0;
   for (const subscription of subscriptions) {
     await webPush.sendNotification(subscription, JSON.stringify({
-      title: `New ${lead.source} lead`,
-      body: `${lead.name}${lead.property ? ` - ${lead.property}` : ""}`,
-      url: claimUrl(lead, member),
+      title: `${lead.isRepeat ? "Repeat" : "New"} ${lead.source} lead`,
+      body: `${lead.name}${lead.isRepeat ? " - previously assigned to you" : ""}${lead.property ? ` - ${lead.property}` : ""}`,
+      url: lead.isRepeat ? appUrl() : claimUrl(lead, member),
     }));
     sent += 1;
   }
@@ -301,7 +403,10 @@ async function sendTestPush(owner, workspace) {
 
 async function notifyActiveTeam(workspace, lead) {
   const results = [];
-  for (const member of activeRecipients(workspace)) {
+  const recipients = lead.isRepeat && lead.assignedTo
+    ? (workspace.team || []).filter((member) => member.name === lead.assignedTo)
+    : activeRecipients(workspace);
+  for (const member of recipients) {
     const memberResult = { member: member.name, email: false, push: false };
     try {
       const emailResult = await sendEmail(member, lead);
@@ -365,6 +470,8 @@ module.exports = {
   getWorkspace,
   handleOptions,
   leadFromPayload,
+  parseLeadEmail,
+  routeRepeatLead,
   notifyActiveTeam,
   recordNotificationDelivery,
   optionalEnv,

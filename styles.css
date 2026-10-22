@@ -557,9 +557,167 @@ p {
 .lead-main strong {
   display: block;
   overflow: hidden;
-  font-size: 0.95rem;
+  font-size: 1.08rem;
+  font-weight: 950;
+  letter-spacing: -0.015em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.lead-badges {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  flex-direction: column;
+}
+
+.temperature-pill {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.68rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.temperature-hot {
+  background: #8f1738;
+  color: #fff !important;
+}
+
+.temperature-warm {
+  background: #9a6408;
+  color: #fff !important;
+}
+
+.temperature-nurture,
+.temperature-cold {
+  background: #234c62;
+  color: #fff !important;
+}
+
+/* Priority dashboard: saturated colors keep hot, warm, and cold leads easy to scan. */
+#dashboardView .metric-card {
+  border: 0;
+  color: #fff;
+  box-shadow: 0 15px 30px rgba(8, 24, 38, 0.18);
+}
+
+#dashboardView .metric-card span {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+#dashboardView .metric-card::before {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+#dashboardView .metric-rose {
+  background: linear-gradient(145deg, #72152f, #431124);
+}
+
+#dashboardView .metric-teal {
+  background: linear-gradient(145deg, #155167, #0b3042);
+}
+
+#dashboardView .metric-green {
+  background: linear-gradient(145deg, #315c3c, #193c2b);
+}
+
+#dashboardView .metric-gold {
+  background: linear-gradient(145deg, #9b6410, #5a3707);
+}
+
+#dashboardView .metric-blue {
+  background: linear-gradient(145deg, #255b7b, #17394f);
+}
+
+#dashboardView > .desk-layout > .panel:first-child,
+#dashboardView > .desk-layout > .panel:nth-child(2) {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, #172c3d, #0d1f2d);
+  box-shadow: 0 20px 44px rgba(8, 24, 38, 0.2);
+}
+
+#dashboardView .panel-header h2 {
+  color: #fff;
+}
+
+#dashboardView .panel-header p,
+#dashboardView .panel-header .eyebrow {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#dashboardView .count-pill,
+#dashboardView > .desk-layout > .panel:first-child .count-pill {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+#dashboardView .lead-card {
+  min-height: 78px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left-width: 7px;
+  padding: 9px 10px;
+  color: #fff;
+  box-shadow: 0 9px 20px rgba(0, 0, 0, 0.16);
+}
+
+#dashboardView .lead-card.hot {
+  border-left-color: #ff557c;
+  background: linear-gradient(135deg, #67172d, #3a1221);
+}
+
+#dashboardView .lead-card.warm {
+  border-left-color: #f2b84b;
+  background: linear-gradient(135deg, #62420c, #382707);
+}
+
+#dashboardView .lead-card.nurture,
+#dashboardView .lead-card.cold {
+  border-left-color: #68b8d5;
+  background: linear-gradient(135deg, #23485d, #152f40);
+}
+
+#dashboardView .lead-card:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  transform: translateY(-1px);
+  box-shadow: 0 13px 28px rgba(0, 0, 0, 0.24);
+}
+
+#dashboardView .lead-main {
+  background: transparent;
+  padding: 4px 3px;
+}
+
+#dashboardView .lead-main strong {
+  color: #fff;
+  font-size: 1.22rem;
+}
+
+#dashboardView .lead-main > div:first-child > span {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.8rem;
+}
+
+#dashboardView .status-pill {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+#dashboardView .empty-state {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.64);
+}
+
+#dashboardView #unclaimedLeads .lead-card.status-new {
+  animation: dashboardPriorityPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes dashboardPriorityPulse {
+  0%, 100% { box-shadow: 0 9px 20px rgba(0, 0, 0, 0.16); }
+  50% { box-shadow: 0 10px 26px rgba(255, 85, 124, 0.25); }
 }
 
 .lead-main span {
