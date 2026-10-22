@@ -883,7 +883,10 @@ function renderOwnerControls() {
   const workflowSelect = document.querySelector("#workflowOwnerSelect");
   workflowOwner = team.some((member) => member.name === workflowOwner) ? workflowOwner : team[0]?.name || "";
   workflowSelect.innerHTML = ownerOptions(workflowOwner, false);
-  document.querySelector("#leadOwnerSelect").innerHTML = ownerOptions("", true);
+  const leadOwnerSelect = document.querySelector("#leadOwnerSelect");
+  const selectedLeadOwner = leadOwnerSelect.value;
+  leadOwnerSelect.innerHTML = ownerOptions(selectedLeadOwner, true);
+  leadOwnerSelect.value = team.some((member) => member.name === selectedLeadOwner) ? selectedLeadOwner : "";
   const csvImportOwner = document.querySelector("#csvImportOwner");
   const selectedImportOwner = csvImportOwner.value;
   csvImportOwner.innerHTML = [
