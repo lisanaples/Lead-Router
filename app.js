@@ -183,6 +183,22 @@ function localSnapshot() {
   return { leads, team, settings };
 }
 
+function leadSnapshotTime(lead) {
+  const time = Date.parse(lead?.updatedAt || lead?.claimedAt || lead?.createdAt || "");
+  return Number.isFinite(time) ? time : 0;
+}
+
+function mergeLeadSnapshots(localLeads = [], cloudLeads = []) {
+  const merged = new Map();
+  cloudLeads.forEach((lead) => merged.set(String(lead.id), lead));
+  localLeads.forEach((lead) => {
+    const id = String(lead.id);
+    const cloudLead = merged.get(id);
+    if (!cloudLead || leadSnapshotTime(lead) > leadSnapshotTime(cloudLead)) merged.set(id, lead);
+  });
+  return [...merged.values()];
+}
+
 function normalizeClaimAssignment(status, assignedTo) {
   const owner = String(assignedTo || "").trim();
   let normalizedStatus = String(status || "new");
@@ -336,15 +352,18 @@ async function syncCloudSnapshot(options = {}) {
     renderSyncStatus();
     const existingRows = await supabaseRequest(`/rest/v1/lead_router_records?id=eq.${encodeURIComponent(CLOUD_RECORD_ID)}&select=data&limit=1`);
     const existingCloudData = existingRows?.[0]?.data || {};
+    const mergedLeads = mergeLeadSnapshots(leads, existingCloudData.leads || []);
+    leads = mergedLeads;
     await supabaseRequest("/rest/v1/lead_router_records?on_conflict=id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates" },
       body: JSON.stringify({
         id: CLOUD_RECORD_ID,
         record_type: "workspace",
-        data: { ...existingCloudData, ...localSnapshot() },
+        data: { ...existingCloudData, ...localSnapshot(), leads: mergedLeads },
       }),
     });
+    saveAll();
     syncState = "saved";
     lastAutoSync = new Date().toISOString();
     localStorage.setItem(LAST_AUTO_SYNC_KEY, lastAutoSync);
@@ -369,6 +388,13 @@ function saveAndSync(options = {}) {
   autoSyncTimer = window.setTimeout(() => {
     syncCloudSnapshot({ silent: options.silent !== false });
   }, options.immediate ? 0 : 900);
+}
+
+async function safeAutoRefreshFromCloud() {
+  if (!cloudSession?.access_token || passwordRecoveryMode || document.hidden) return;
+  if (syncState === "pending" || syncState === "saving") return;
+  if (document.querySelector("dialog[open]")) return;
+  await refreshFromCloud({ silent: true });
 }
 
 function currentAppVersion() {
@@ -1205,7 +1231,7 @@ function renderSyncStatus() {
   const syncLabels = {
     pending: "Auto-save pending",
     saving: "Saving to cloud...",
-    saved: "Auto-saved",
+    saved: "Connected to Supabase • Auto-saved",
     error: "Auto-save needs attention",
     idle: "Connected to Supabase",
   };
@@ -1214,7 +1240,7 @@ function renderSyncStatus() {
   document.querySelector("#syncHelper").textContent = passwordRecoveryMode
     ? "Enter and save your new password below."
     : signedIn
-    ? `Changes save automatically.${lastSavedText} Use Refresh if another device changed leads.`
+    ? `Changes save automatically.${lastSavedText} Other-device claims refresh automatically.`
     : "Sign in to share leads and claims with the team.";
   document.querySelector("#authForm").classList.toggle("hidden", signedIn);
   document.querySelector("#passwordResetForm").classList.toggle("hidden", !passwordRecoveryMode);
@@ -2535,6 +2561,10 @@ if (authCallback?.error) showToast(`This sign-in link could not be used: ${authC
 processClaimLink();
 checkForAppUpdate({ silent: true });
 window.setInterval(() => checkForAppUpdate({ silent: true }), 5 * 60 * 1000);
+window.setInterval(safeAutoRefreshFromCloud, 30 * 1000);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) checkForAppUpdate({ silent: true });
+  if (!document.hidden) {
+    checkForAppUpdate({ silent: true });
+    safeAutoRefreshFromCloud();
+  }
 });

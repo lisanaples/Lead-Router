@@ -26,6 +26,8 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Expands team invitation emails with complete iPhone/Android push setup, test, and troubleshooting instructions.
 - Prevents claimed-but-unassigned records, automatically claims newly assigned leads, and returns ownerless claimed records to New/Unclaimed.
 - Preserves saved phone push subscriptions when the browser syncs lead and team changes.
+- Merges each lead by its latest update time so an older browser cannot overwrite a newer claim.
+- Refreshes shared cloud claims automatically every 30 seconds and whenever the app returns to the foreground.
 - Imports the supplied FiveStreet Agent 2 owner fields, full property address, property price, original received date, claimed date, notes, and translated FiveStreet statuses.
 - Recognizes a leading name followed directly by intent wording, such as “Jennifer Jitters, looking for more info …”.
 - Downloads lead CSV files by owner/team member.
