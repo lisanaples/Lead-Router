@@ -845,7 +845,7 @@ function filteredLeads() {
   return visibleLeads().filter((lead) => {
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     const matchesOwner = ownerFilter === "all" || String(lead.assignedTo || "") === ownerFilter;
-    const haystack = [lead.name, lead.source, lead.type, lead.phone, lead.email, lead.property, lead.price, lead.message, lead.assignedTo]
+    const haystack = [lead.name, lead.source, lead.type, lead.phone, lead.email, lead.property, lead.price, lead.message, lead.assignedTo, lead.previousOwner]
       .join(" ")
       .toLowerCase();
     return matchesStatus && matchesOwner && haystack.includes(term);
@@ -2161,15 +2161,33 @@ function fiveStreetPrice(row, headerMap) {
   return Number.isFinite(numeric) ? `$${numeric.toLocaleString("en-US")}` : value;
 }
 
+function fiveStreetImportAssignment(row, headerMap, importOwner = "") {
+  const originalStatus = rowValue(row, headerMap, ["status", "lead status", "stage"]);
+  const normalizedStatus = normalizeLeadStatus(originalStatus);
+  const previousOwner = fiveStreetOwnerLabel(row, headerMap);
+  const currentOwner = importOwner || fiveStreetOwner(row, headerMap);
+  if (currentOwner) {
+    return {
+      ...normalizeClaimAssignment(normalizedStatus, currentOwner),
+      previousOwner,
+      importCategory: "current-owner",
+    };
+  }
+  if (["attempted", "contacted", "nurture", "appointment", "consultation"].includes(normalizedStatus)) {
+    return { status: "new", assignedTo: "", previousOwner, importCategory: "review" };
+  }
+  if (["closed", "converted", "lost", "doNotContact"].includes(normalizedStatus)) {
+    return { status: normalizedStatus, assignedTo: "", previousOwner, importCategory: "closed" };
+  }
+  return { status: "archived", assignedTo: "", previousOwner, importCategory: "legacy" };
+}
+
 function leadFromCsvRow(row, headerMap, importOwner = "", importId = 0) {
   const first = rowValue(row, headerMap, ["first name", "firstname"]);
   const last = rowValue(row, headerMap, ["last name", "lastname"]);
   const fullName = rowValue(row, headerMap, ["name", "lead name", "contact name", "client"]);
   const status = rowValue(row, headerMap, ["status", "lead status", "stage"]);
-  const assignedOwner = importOwner || fiveStreetOwner(row, headerMap);
-  const claimAssignment = assignedOwner
-    ? normalizeClaimAssignment(normalizeLeadStatus(status), assignedOwner)
-    : { status: "new", assignedTo: "" };
+  const claimAssignment = fiveStreetImportAssignment(row, headerMap, importOwner);
   const receivedAt = normalizeCsvDateTime(rowValue(row, headerMap, ["lead received at", "received at", "date", "lead date"]));
   const claimedAt = normalizeCsvDate(rowValue(row, headerMap, ["claimed at", "claimed date"]));
   return {
@@ -2184,6 +2202,8 @@ function leadFromCsvRow(row, headerMap, importOwner = "", importId = 0) {
     urgency: normalizeUrgency(rowValue(row, headerMap, ["urgency", "priority", "temperature"]), status),
     status: claimAssignment.status,
     assignedTo: claimAssignment.assignedTo,
+    previousOwner: claimAssignment.previousOwner,
+    importCategory: claimAssignment.importCategory,
     nextFollowUpDate: normalizeCsvDate(rowValue(row, headerMap, ["next follow up", "next follow-up", "follow up date", "follow-up date", "next task date"])),
     firstAttemptedAt: normalizeCsvDate(rowValue(row, headerMap, ["first attempted", "contact attempted", "first contact attempted"])),
     claimedAt,
@@ -2196,7 +2216,15 @@ function leadFromCsvRow(row, headerMap, importOwner = "", importId = 0) {
     message: rowValue(row, headerMap, ["message", "notes", "comments", "inquiry"]),
     createdAt: receivedAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    activity: [{ at: receivedAt || new Date().toISOString(), text: claimedAt ? `Imported from FiveStreet CSV. Originally claimed ${claimedAt}.` : "Imported from FiveStreet CSV." }],
+    activity: [{
+      at: receivedAt || new Date().toISOString(),
+      text: [
+        "Imported from FiveStreet CSV.",
+        claimAssignment.previousOwner ? `Original FiveStreet owner: ${claimAssignment.previousOwner}.` : "No original owner.",
+        `Original status: ${status || "blank"}.`,
+        claimedAt ? `Originally claimed ${claimedAt}.` : "",
+      ].filter(Boolean).join(" "),
+    }],
   };
 }
 
@@ -2212,13 +2240,24 @@ function importFiveStreetCsv(file) {
     const headers = rows[0].map(normalizedHeader);
     const headerMap = Object.fromEntries(headers.map((header, index) => [header, index]));
     const dataRows = rows.slice(1);
-    const unmatchedOwners = [...new Set(dataRows.map((row) => fiveStreetOwnerLabel(row, headerMap)).filter((owner) => owner && !fiveStreetOwner(row, headerMap)))];
-    if (!importOwner && unmatchedOwners.length) {
-      const proceed = window.confirm(`${unmatchedOwners.length} FiveStreet agent name(s) do not match a current Lead Relay team member:\n\n${unmatchedOwners.join("\n")}\n\nTheir leads will import as unclaimed. Continue?`);
-      if (!proceed) return;
-    }
     const importStartedAt = Date.now();
     const imported = dataRows.map((row, index) => leadFromCsvRow(row, headerMap, importOwner, importStartedAt + index));
+    const counts = imported.reduce((summary, lead) => {
+      summary[lead.importCategory] = (summary[lead.importCategory] || 0) + 1;
+      return summary;
+    }, {});
+    const unmatchedOwners = [...new Set(dataRows.map((row) => fiveStreetOwnerLabel(row, headerMap)).filter((owner) => owner && !fiveStreetOwner(row, headerMap)))];
+    const summary = importOwner
+      ? `${imported.length} leads will be assigned to ${importOwner}.`
+      : [
+        `${counts["current-owner"] || 0} assigned to current team members`,
+        `${counts.review || 0} active/future leads added as Unclaimed for review`,
+        `${counts.legacy || 0} older leads added as searchable Legacy/Archived records`,
+        `${counts.closed || 0} closed/final-status leads preserved without a current owner`,
+        unmatchedOwners.length ? `Former owners retained in history: ${unmatchedOwners.join(", ")}` : "",
+      ].filter(Boolean).join("\n");
+    const proceed = window.confirm(`Review this FiveStreet import before saving:\n\n${summary}\n\nImport ${imported.length} leads now?`);
+    if (!proceed) return;
     leads = [...imported, ...leads];
     saveAndSync({ silent: false });
     renderAll();

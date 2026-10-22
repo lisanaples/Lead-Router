@@ -29,6 +29,8 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Merges each lead by its latest update time so an older browser cannot overwrite a newer claim.
 - Refreshes shared cloud claims automatically every 30 seconds and whenever the app returns to the foreground.
 - Keeps the selected owner in the edit form while auto-saving, so Done cannot accidentally return an assigned lead to Unclaimed.
+- Imports FiveStreet leads for current agents as assigned, preserves former owners in history, sends active former-owner records to Unclaimed review, and archives older legacy records so they remain searchable without flooding the dashboard.
+- Shows a category count and former-owner summary for confirmation before a FiveStreet import is saved.
 - Imports the supplied FiveStreet Agent 2 owner fields, full property address, property price, original received date, claimed date, notes, and translated FiveStreet statuses.
 - Recognizes a leading name followed directly by intent wording, such as “Jennifer Jitters, looking for more info …”.
 - Downloads lead CSV files by owner/team member.
