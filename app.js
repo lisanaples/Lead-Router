@@ -1265,6 +1265,7 @@ function fillLeadForm(lead = {}) {
   form.elements.assignedTo.value = lead.assignedTo || "";
   form.elements.nextFollowUpDate.value = lead.nextFollowUpDate || "";
   form.elements.firstAttemptedAt.value = lead.firstAttemptedAt || "";
+  form.elements.claimedAt.value = lead.claimedAt || "";
   form.elements.firstContactedAt.value = lead.firstContactedAt || "";
   form.elements.appointmentSetAt.value = lead.appointmentSetAt || "";
   form.elements.consultationCompletedAt.value = lead.consultationCompletedAt || "";
@@ -1470,6 +1471,7 @@ function saveLead(form, options = {}) {
     assignedTo: claimAssignment.assignedTo,
     nextFollowUpDate: data.get("nextFollowUpDate") || "",
     firstAttemptedAt: data.get("firstAttemptedAt") || "",
+    claimedAt: data.get("claimedAt") || existing?.claimedAt || "",
     firstContactedAt: data.get("firstContactedAt") || "",
     appointmentSetAt: data.get("appointmentSetAt") || "",
     consultationCompletedAt: data.get("consultationCompletedAt") || "",
@@ -2052,6 +2054,10 @@ function matchTeamMember(value) {
 function normalizeLeadStatus(value) {
   const normalized = String(value || "").toLowerCase();
   const compact = normalized.replace(/[^a-z0-9]+/g, "");
+  if (compact === "engage") return "attempted";
+  if (compact === "active") return "contacted";
+  if (compact === "future") return "nurture";
+  if (compact === "inactive") return "archived";
   if (normalized.includes("do not contact") || compact.includes("donotcontact") || normalized.includes("dnc")) return "doNotContact";
   if (normalized.includes("archive")) return "archived";
   if (normalized.includes("no contact") || compact.includes("nocontact")) return "noContact";
@@ -2084,27 +2090,74 @@ function normalizeCsvDate(value) {
   return `${year}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}`;
 }
 
-function leadFromCsvRow(row, headerMap, importOwner = "") {
+function normalizeCsvDateTime(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const match = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}:\d{2}:\d{2})\s+(EST|EDT)$/i);
+  if (match) {
+    const offset = match[5].toUpperCase() === "EDT" ? "-04:00" : "-05:00";
+    return new Date(`${match[3]}-${match[1].padStart(2, "0")}-${match[2].padStart(2, "0")}T${match[4]}${offset}`).toISOString();
+  }
+  const dateOnly = normalizeCsvDate(text);
+  return dateOnly ? `${dateOnly}T12:00:00.000Z` : "";
+}
+
+function fiveStreetOwner(row, headerMap) {
+  const candidates = [
+    rowValue(row, headerMap, ["agent 2 name"]),
+    rowValue(row, headerMap, ["agent 2 login email"]),
+    rowValue(row, headerMap, ["agent 2 fivestreet email"]),
+    rowValue(row, headerMap, ["owner", "agent", "assigned to", "assigned agent", "user", "claimed by"]),
+  ].filter(Boolean);
+  return candidates.map(matchTeamMember).find(Boolean) || "";
+}
+
+function fiveStreetOwnerLabel(row, headerMap) {
+  return rowValue(row, headerMap, ["agent 2 name", "agent 2 login email", "owner", "assigned to", "assigned agent"]);
+}
+
+function fiveStreetProperty(row, headerMap) {
+  const street = rowValue(row, headerMap, ["property street"]);
+  const city = rowValue(row, headerMap, ["property city"]);
+  const state = rowValue(row, headerMap, ["property state"]);
+  const zip = rowValue(row, headerMap, ["property zipcode", "property zip", "zip code", "zipcode"]);
+  const combined = [street, city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return combined || rowValue(row, headerMap, ["property unformatted address", "property", "address", "listing", "area", "city"]);
+}
+
+function fiveStreetPrice(row, headerMap) {
+  const value = rowValue(row, headerMap, ["property price", "price", "price range", "listing price"]);
+  if (!value) return "";
+  const numeric = Number(value.replace(/[$,\s]/g, ""));
+  return Number.isFinite(numeric) ? `$${numeric.toLocaleString("en-US")}` : value;
+}
+
+function leadFromCsvRow(row, headerMap, importOwner = "", importId = 0) {
   const first = rowValue(row, headerMap, ["first name", "firstname"]);
   const last = rowValue(row, headerMap, ["last name", "lastname"]);
   const fullName = rowValue(row, headerMap, ["name", "lead name", "contact name", "client"]);
   const status = rowValue(row, headerMap, ["status", "lead status", "stage"]);
-  const owner = rowValue(row, headerMap, ["owner", "agent", "assigned to", "assigned agent", "user", "claimed by"]);
-  const claimAssignment = normalizeClaimAssignment(normalizeLeadStatus(status), importOwner || matchTeamMember(owner));
+  const assignedOwner = importOwner || fiveStreetOwner(row, headerMap);
+  const claimAssignment = assignedOwner
+    ? normalizeClaimAssignment(normalizeLeadStatus(status), assignedOwner)
+    : { status: "new", assignedTo: "" };
+  const receivedAt = normalizeCsvDateTime(rowValue(row, headerMap, ["lead received at", "received at", "date", "lead date"]));
+  const claimedAt = normalizeCsvDate(rowValue(row, headerMap, ["claimed at", "claimed date"]));
   return {
-    id: Date.now() + Math.floor(Math.random() * 100000),
+    id: importId || Date.now() + Math.floor(Math.random() * 100000),
     source: rowValue(row, headerMap, ["source", "lead source", "provider"]) || "FiveStreet",
     type: rowValue(row, headerMap, ["type", "lead type", "buyer seller"]) || "Buyer",
     name: fullName || [first, last].filter(Boolean).join(" ") || "Imported Lead",
     phone: rowValue(row, headerMap, ["phone", "phone number", "mobile", "cell"]),
     email: rowValue(row, headerMap, ["email", "email address"]),
-    property: rowValue(row, headerMap, ["property", "address", "listing", "area", "city"]),
-    price: rowValue(row, headerMap, ["price", "price range", "listing price"]),
+    property: fiveStreetProperty(row, headerMap),
+    price: fiveStreetPrice(row, headerMap),
     urgency: normalizeUrgency(rowValue(row, headerMap, ["urgency", "priority", "temperature"]), status),
     status: claimAssignment.status,
     assignedTo: claimAssignment.assignedTo,
     nextFollowUpDate: normalizeCsvDate(rowValue(row, headerMap, ["next follow up", "next follow-up", "follow up date", "follow-up date", "next task date"])),
     firstAttemptedAt: normalizeCsvDate(rowValue(row, headerMap, ["first attempted", "contact attempted", "first contact attempted"])),
+    claimedAt,
     firstContactedAt: normalizeCsvDate(rowValue(row, headerMap, ["first contacted", "contact made", "first contact made"])),
     appointmentSetAt: normalizeCsvDate(rowValue(row, headerMap, ["appointment set", "appointment date"])),
     consultationCompletedAt: normalizeCsvDate(rowValue(row, headerMap, ["consultation completed", "consult date", "buyer consult", "seller consult"])),
@@ -2112,9 +2165,9 @@ function leadFromCsvRow(row, headerMap, importOwner = "") {
     lostAt: normalizeCsvDate(rowValue(row, headerMap, ["lost date", "closed lost"])),
     outcomeNotes: rowValue(row, headerMap, ["lost reason", "outcome", "outcome notes"]),
     message: rowValue(row, headerMap, ["message", "notes", "comments", "inquiry"]),
-    createdAt: new Date().toISOString(),
+    createdAt: receivedAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    activity: [{ at: new Date().toISOString(), text: "Imported from FiveStreet CSV." }],
+    activity: [{ at: receivedAt || new Date().toISOString(), text: claimedAt ? `Imported from FiveStreet CSV. Originally claimed ${claimedAt}.` : "Imported from FiveStreet CSV." }],
   };
 }
 
@@ -2129,7 +2182,14 @@ function importFiveStreetCsv(file) {
     }
     const headers = rows[0].map(normalizedHeader);
     const headerMap = Object.fromEntries(headers.map((header, index) => [header, index]));
-    const imported = rows.slice(1).map((row) => leadFromCsvRow(row, headerMap, importOwner));
+    const dataRows = rows.slice(1);
+    const unmatchedOwners = [...new Set(dataRows.map((row) => fiveStreetOwnerLabel(row, headerMap)).filter((owner) => owner && !fiveStreetOwner(row, headerMap)))];
+    if (!importOwner && unmatchedOwners.length) {
+      const proceed = window.confirm(`${unmatchedOwners.length} FiveStreet agent name(s) do not match a current Lead Relay team member:\n\n${unmatchedOwners.join("\n")}\n\nTheir leads will import as unclaimed. Continue?`);
+      if (!proceed) return;
+    }
+    const importStartedAt = Date.now();
+    const imported = dataRows.map((row, index) => leadFromCsvRow(row, headerMap, importOwner, importStartedAt + index));
     leads = [...imported, ...leads];
     saveAndSync({ silent: false });
     renderAll();
@@ -2157,7 +2217,7 @@ function downloadOwnerLeads(owner) {
   const ownerName = owner || workflowOwner || team[0]?.name || "";
   const rows = leads.filter((lead) => lead.assignedTo === ownerName);
   downloadCsv(`${ownerName || "unassigned"}-leads.csv`, [
-    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Contact Attempts", "Next Follow-Up", "First Attempted", "First Contacted", "Appointment Set", "Consultation Completed", "Converted", "Lost", "Outcome Notes", "Message"],
+    ["Name", "Phone", "Email", "Source", "Type", "Property", "Price", "Urgency", "Status", "Received At", "Claimed Date", "Contact Attempts", "Next Follow-Up", "First Attempted", "First Contacted", "Appointment Set", "Consultation Completed", "Converted", "Lost", "Outcome Notes", "Message"],
     ...rows.map((lead) => [
       lead.name,
       lead.phone,
@@ -2168,6 +2228,8 @@ function downloadOwnerLeads(owner) {
       lead.price,
       lead.urgency,
       statusLabel(lead.status),
+      lead.createdAt,
+      lead.claimedAt,
       lead.contactAttempts || 0,
       lead.nextFollowUpDate,
       lead.firstAttemptedAt,

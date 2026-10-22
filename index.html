@@ -411,6 +411,7 @@
           </div>
           <div class="form-grid">
             <label>First contact attempted <input name="firstAttemptedAt" type="date" /></label>
+            <label>Claimed date <input name="claimedAt" type="date" /></label>
             <label>First contact made <input name="firstContactedAt" type="date" /></label>
             <label>Appointment set <input name="appointmentSetAt" type="date" /></label>
             <label>Consultation completed <input name="consultationCompletedAt" type="date" /></label>
@@ -525,7 +526,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=56"></script>
+    <script src="app.js?v=57"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
