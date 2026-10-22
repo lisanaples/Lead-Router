@@ -2228,40 +2228,79 @@ function leadFromCsvRow(row, headerMap, importOwner = "", importId = 0) {
   };
 }
 
+function setCsvImportStatus(message, state = "") {
+  const status = document.querySelector("#csvImportStatus");
+  status.textContent = message;
+  if (state) status.dataset.state = state;
+  else delete status.dataset.state;
+}
+
 function importFiveStreetCsv(file) {
+  if (!file) return;
+  if (!/\.csv$/i.test(file.name)) {
+    setCsvImportStatus("Choose a FiveStreet file ending in .csv.", "error");
+    showToast("That is not a CSV file.");
+    return;
+  }
   const importOwner = document.querySelector("#csvImportOwner").value;
   const reader = new FileReader();
+  setCsvImportStatus(`Reading ${file.name}...`, "working");
   reader.addEventListener("load", () => {
-    const rows = parseCsv(String(reader.result || ""));
-    if (rows.length < 2) {
-      showToast("No leads found in that CSV.");
-      return;
-    }
-    const headers = rows[0].map(normalizedHeader);
-    const headerMap = Object.fromEntries(headers.map((header, index) => [header, index]));
-    const dataRows = rows.slice(1);
-    const importStartedAt = Date.now();
-    const imported = dataRows.map((row, index) => leadFromCsvRow(row, headerMap, importOwner, importStartedAt + index));
-    const counts = imported.reduce((summary, lead) => {
-      summary[lead.importCategory] = (summary[lead.importCategory] || 0) + 1;
-      return summary;
-    }, {});
-    const unmatchedOwners = [...new Set(dataRows.map((row) => fiveStreetOwnerLabel(row, headerMap)).filter((owner) => owner && !fiveStreetOwner(row, headerMap)))];
-    const summary = importOwner
-      ? `${imported.length} leads will be assigned to ${importOwner}.`
-      : [
-        `${counts["current-owner"] || 0} assigned to current team members`,
-        `${counts.review || 0} active/future leads added as Unclaimed for review`,
-        `${counts.legacy || 0} older leads added as searchable Legacy/Archived records`,
-        `${counts.closed || 0} closed/final-status leads preserved without a current owner`,
-        unmatchedOwners.length ? `Former owners retained in history: ${unmatchedOwners.join(", ")}` : "",
-      ].filter(Boolean).join("\n");
-    const proceed = window.confirm(`Review this FiveStreet import before saving:\n\n${summary}\n\nImport ${imported.length} leads now?`);
-    if (!proceed) return;
-    leads = [...imported, ...leads];
-    saveAndSync({ silent: false });
-    renderAll();
-    showToast(`${imported.length} FiveStreet leads imported${importOwner ? ` and assigned to ${importOwner}` : ""}.`);
+    setCsvImportStatus(`Preparing ${file.name}. This can take several seconds...`, "working");
+    window.setTimeout(() => {
+      try {
+        const rows = parseCsv(String(reader.result || ""));
+        if (rows.length < 2) throw new Error("No lead rows were found in that CSV.");
+        const headers = rows[0].map(normalizedHeader);
+        const headerMap = Object.fromEntries(headers.map((header, index) => [header, index]));
+        if (headerMap.name === undefined || headerMap.status === undefined || headerMap.agent2name === undefined) {
+          throw new Error("This file does not have the expected FiveStreet Name, Status, and Agent 2 Name columns.");
+        }
+        const dataRows = rows.slice(1);
+        const importStartedAt = Date.now();
+        const imported = dataRows.map((row, index) => leadFromCsvRow(row, headerMap, importOwner, importStartedAt + index));
+        const counts = imported.reduce((summary, lead) => {
+          summary[lead.importCategory] = (summary[lead.importCategory] || 0) + 1;
+          return summary;
+        }, {});
+        const unmatchedOwners = [...new Set(dataRows.map((row) => fiveStreetOwnerLabel(row, headerMap)).filter((owner) => owner && !fiveStreetOwner(row, headerMap)))];
+        const summary = importOwner
+          ? `${imported.length} leads will be assigned to ${importOwner}.`
+          : [
+            `${counts["current-owner"] || 0} assigned to current team members`,
+            `${counts.review || 0} active/future leads added as Unclaimed for review`,
+            `${counts.legacy || 0} older leads added as searchable Legacy/Archived records`,
+            `${counts.closed || 0} closed/final-status leads preserved without a current owner`,
+            unmatchedOwners.length ? `Former owners retained in history: ${unmatchedOwners.join(", ")}` : "",
+          ].filter(Boolean).join("\n");
+        setCsvImportStatus(`${imported.length} leads are ready for review.`, "working");
+        const proceed = window.confirm(`Review this FiveStreet import before saving:\n\n${summary}\n\nImport ${imported.length} leads now?`);
+        if (!proceed) {
+          setCsvImportStatus("Import cancelled. No leads were added.");
+          return;
+        }
+        const previousLeads = leads;
+        try {
+          setCsvImportStatus(`Adding ${imported.length} leads and saving them to Supabase...`, "working");
+          leads = [...imported, ...leads];
+          saveAndSync({ silent: false, immediate: true });
+          renderAll();
+        } catch (error) {
+          leads = previousLeads;
+          saveAll();
+          throw error;
+        }
+        setCsvImportStatus(`${imported.length} FiveStreet leads added. Wait for Connected to Supabase • Auto-saved before closing the app.`, "success");
+        showToast(`${imported.length} FiveStreet leads imported${importOwner ? ` and assigned to ${importOwner}` : ""}.`);
+      } catch (error) {
+        setCsvImportStatus(`Import stopped: ${error.message}`, "error");
+        showToast(`FiveStreet import failed: ${error.message}`);
+      }
+    }, 50);
+  });
+  reader.addEventListener("error", () => {
+    setCsvImportStatus(`Could not read ${file.name}. Choose the file again.`, "error");
+    showToast("The CSV file could not be read.");
   });
   reader.readAsText(file);
 }
@@ -2514,7 +2553,9 @@ document.querySelector("#importInput").addEventListener("change", (event) => {
   if (event.target.files[0]) importData(event.target.files[0]);
 });
 document.querySelector("#csvImportInput").addEventListener("change", (event) => {
-  if (event.target.files[0]) importFiveStreetCsv(event.target.files[0]);
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (file) importFiveStreetCsv(file);
 });
 document.querySelector("#authForm").addEventListener("submit", async (event) => {
   event.preventDefault();

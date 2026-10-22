@@ -346,6 +346,7 @@
                   <input id="csvImportInput" type="file" accept=".csv,text/csv" />
                 </label>
               </div>
+              <p class="csv-import-status" id="csvImportStatus" role="status" aria-live="polite">No FiveStreet file selected.</p>
             </div>
           </section>
         </section>
@@ -526,7 +527,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=61"></script>
+    <script src="app.js?v=62"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
