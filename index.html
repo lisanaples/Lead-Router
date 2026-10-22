@@ -181,6 +181,7 @@
             <div class="button-row">
               <button class="primary-button" type="button" id="parseEmailButton">Preview lead</button>
               <button class="primary-button hidden" type="button" id="createParsedLeadButton">Create and notify</button>
+              <button class="ghost-button hidden" type="button" id="cancelParsedLeadButton">Cancel / start over</button>
               <button class="ghost-button" type="button" id="loadSampleButton">Load sample</button>
             </div>
             <div class="parsed-lead-preview hidden" id="parsedLeadPreview"></div>
@@ -524,7 +525,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=52"></script>
+    <script src="app.js?v=53"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

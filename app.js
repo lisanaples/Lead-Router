@@ -1913,7 +1913,20 @@ function createLeadFromEmail() {
   parsedLeadDraft = parseLeadEmail(text);
   renderParsedLeadPreview(parsedLeadDraft);
   document.querySelector("#createParsedLeadButton").classList.remove("hidden");
+  document.querySelector("#cancelParsedLeadButton").classList.remove("hidden");
   showToast("Lead preview ready. Review before sending.");
+}
+
+function resetParsedLeadIntake(options = {}) {
+  parsedLeadDraft = null;
+  document.querySelector("#leadEmailText").value = "";
+  const preview = document.querySelector("#parsedLeadPreview");
+  preview.innerHTML = "";
+  preview.classList.add("hidden");
+  document.querySelector("#createParsedLeadButton").classList.add("hidden");
+  document.querySelector("#cancelParsedLeadButton").classList.add("hidden");
+  if (options.focus !== false) document.querySelector("#leadEmailText").focus();
+  if (!options.silent) showToast("Lead preview cleared. Paste another lead when ready.");
 }
 
 async function createParsedLeadAndNotify() {
@@ -1928,10 +1941,7 @@ async function createParsedLeadAndNotify() {
       body: JSON.stringify(parsedLeadDraft),
     });
     await refreshFromCloud({ silent: true });
-    document.querySelector("#leadEmailText").value = "";
-    document.querySelector("#parsedLeadPreview").classList.add("hidden");
-    document.querySelector("#createParsedLeadButton").classList.add("hidden");
-    parsedLeadDraft = null;
+    resetParsedLeadIntake({ silent: true, focus: false });
     switchView("dashboard");
     showToast(`Lead created. ${notificationDeliveryText(result.notifications || [])}`);
   } catch (error) {
@@ -2311,6 +2321,7 @@ document.querySelector("#teamForm").addEventListener("change", scheduleTeamFormA
 
 document.querySelector("#parseEmailButton").addEventListener("click", createLeadFromEmail);
 document.querySelector("#createParsedLeadButton").addEventListener("click", createParsedLeadAndNotify);
+document.querySelector("#cancelParsedLeadButton").addEventListener("click", resetParsedLeadIntake);
 document.querySelector("#loadSampleButton").addEventListener("click", loadSampleEmail);
 document.querySelector("#leadSearch").addEventListener("input", (event) => {
   searchTerm = event.target.value;

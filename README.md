@@ -21,6 +21,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Recognizes conversational intake wording such as “My name is Fake Buyer” when extracting a lead name.
 - Recognizes conversational names even when the name starts on the following line.
 - Recognizes natural introductions using “I’m …” while avoiding intent phrases such as “I’m interested in …”.
+- Adds a Cancel / start over button that clears the pasted intake, preview form, and current draft.
 - Downloads lead CSV files by owner/team member.
 - Shows an owner workflow with daily contacts and a hot-to-cold pipeline.
 - Adds a My Leads view for the selected team member.
