@@ -2072,10 +2072,11 @@ function rowValue(row, headerMap, names) {
 function matchTeamMember(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (!normalized) return "";
+  const normalizedPhone = normalized.replace(/\D/g, "");
   const member = team.find((entry) => (
     entry.name.toLowerCase() === normalized ||
     String(entry.email || "").toLowerCase() === normalized ||
-    String(entry.phone || "").replace(/\D/g, "") === normalized.replace(/\D/g, "")
+    (normalizedPhone && String(entry.phone || "").replace(/\D/g, "") === normalizedPhone)
   ));
   return member?.name || "";
 }
@@ -2263,7 +2264,9 @@ function importFiveStreetCsv(file) {
           summary[lead.importCategory] = (summary[lead.importCategory] || 0) + 1;
           return summary;
         }, {});
-        const unmatchedOwners = [...new Set(dataRows.map((row) => fiveStreetOwnerLabel(row, headerMap)).filter((owner) => owner && !fiveStreetOwner(row, headerMap)))];
+        const unmatchedOwners = [...new Set(dataRows
+          .filter((row) => fiveStreetOwnerLabel(row, headerMap) && !fiveStreetOwner(row, headerMap))
+          .map((row) => fiveStreetOwnerLabel(row, headerMap)))];
         const summary = importOwner
           ? `${imported.length} leads will be assigned to ${importOwner}.`
           : [
