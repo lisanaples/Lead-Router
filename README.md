@@ -23,6 +23,9 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Recognizes natural introductions using “I’m …” while avoiding intent phrases such as “I’m interested in …”.
 - Adds a Cancel / start over button that clears the pasted intake, preview form, and current draft.
 - Recognizes a lead’s name at the beginning of conversational text, such as “Randy Bucks, I’ve …”.
+- Expands team invitation emails with complete iPhone/Android push setup, test, and troubleshooting instructions.
+- Prevents claimed-but-unassigned records, automatically claims newly assigned leads, and returns ownerless claimed records to New/Unclaimed.
+- Preserves saved phone push subscriptions when the browser syncs lead and team changes.
 - Downloads lead CSV files by owner/team member.
 - Shows an owner workflow with daily contacts and a hot-to-cold pipeline.
 - Adds a My Leads view for the selected team member.

@@ -183,9 +183,20 @@ function localSnapshot() {
   return { leads, team, settings };
 }
 
+function normalizeClaimAssignment(status, assignedTo) {
+  const owner = String(assignedTo || "").trim();
+  let normalizedStatus = String(status || "new");
+  if (normalizedStatus === "claimed" && !owner) normalizedStatus = "new";
+  if (normalizedStatus === "new" && owner) normalizedStatus = "claimed";
+  return { status: normalizedStatus, assignedTo: owner };
+}
+
 function applySnapshot(snapshot) {
   if (!snapshot) return;
-  leads = Array.isArray(snapshot.leads) ? snapshot.leads : leads;
+  leads = (Array.isArray(snapshot.leads) ? snapshot.leads : leads).map((lead) => ({
+    ...lead,
+    ...normalizeClaimAssignment(lead.status, lead.assignedTo),
+  }));
   team = Array.isArray(snapshot.team) ? snapshot.team : team;
   settings = snapshot.settings || settings;
   team = team.map((member) => ({
@@ -300,7 +311,9 @@ async function refreshFromCloud(options = {}) {
   try {
     const rows = await supabaseRequest(`/rest/v1/lead_router_records?id=eq.${encodeURIComponent(CLOUD_RECORD_ID)}&select=data&limit=1`);
     if (rows?.[0]?.data) {
+      const repairedClaimAssignment = (rows[0].data.leads || []).some((lead) => lead.status === "claimed" && !String(lead.assignedTo || "").trim());
       applySnapshot(rows[0].data);
+      if (repairedClaimAssignment) await syncCloudSnapshot({ silent: true });
       if (!options.silent) showToast("Cloud data refreshed.");
     } else if (!options.silent) {
       await syncCloudSnapshot({ silent: true });
@@ -321,13 +334,15 @@ async function syncCloudSnapshot(options = {}) {
   try {
     syncState = "saving";
     renderSyncStatus();
+    const existingRows = await supabaseRequest(`/rest/v1/lead_router_records?id=eq.${encodeURIComponent(CLOUD_RECORD_ID)}&select=data&limit=1`);
+    const existingCloudData = existingRows?.[0]?.data || {};
     await supabaseRequest("/rest/v1/lead_router_records?on_conflict=id", {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates" },
       body: JSON.stringify({
         id: CLOUD_RECORD_ID,
         record_type: "workspace",
-        data: localSnapshot(),
+        data: { ...existingCloudData, ...localSnapshot() },
       }),
     });
     syncState = "saved";
@@ -1437,6 +1452,10 @@ function saveLead(form, options = {}) {
   const existing = leads.find((lead) => lead.id === existingId);
   const hasDraftContent = ["source", "name", "phone", "email", "property", "price", "message"].some((key) => String(data.get(key) || "").trim());
   if (!existing && !hasDraftContent) return null;
+  const claimAssignment = normalizeClaimAssignment(
+    String(data.get("status") || existing?.status || "new"),
+    String(data.get("assignedTo") || "")
+  );
   const lead = {
     id: existing?.id || Date.now(),
     source: String(data.get("source") || "").trim() || "Manual lead",
@@ -1447,8 +1466,8 @@ function saveLead(form, options = {}) {
     property: String(data.get("property") || "").trim(),
     price: String(data.get("price") || "").trim(),
     urgency: String(data.get("urgency") || "Warm"),
-    status: String(data.get("status") || existing?.status || "new"),
-    assignedTo: String(data.get("assignedTo") || "").trim(),
+    status: claimAssignment.status,
+    assignedTo: claimAssignment.assignedTo,
     nextFollowUpDate: data.get("nextFollowUpDate") || "",
     firstAttemptedAt: data.get("firstAttemptedAt") || "",
     firstContactedAt: data.get("firstContactedAt") || "",
@@ -1677,7 +1696,7 @@ function teamInviteBody(member) {
   const accessLine = fullAccessFor(member)
     ? "You will have full-access assistant/admin access, which means you can see the full team lead workspace."
     : "You will have team-member access, which means you can see unclaimed leads and the leads you claim.";
-  return `Hi ${member.name},\n\nI am inviting you to Lead Relay, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone:\n${leadRouterAppUrl()}\n\n2. Create an account using this exact email address:\n${member.email}\n\n3. Sign in, then choose yourself under Working as if it is not already selected.\n\n4. Add Lead Relay to your phone home screen:\n- iPhone: open the link in Safari, tap Share, then Add to Home Screen.\n- Android: open the link in Chrome, tap the menu, then Add to Home screen or Install app.\n\n5. Open Lead Relay from the Home Screen and tap Enable push alerts. If your phone asks whether to allow notifications, choose Allow.\n\nOnce a lead comes in, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
+  return `Hi ${member.name},\n\nI am inviting you to Lead Relay, our first-to-claim lead app.\n\n${accessLine}\n\nPlease set it up this way:\n\n1. Open this link on your phone:\n${leadRouterAppUrl()}\n\n2. Create an account using this exact email address:\n${member.email}\n\n3. Sign in, then choose your name under Working as if it is not already selected. Push alerts are connected to the selected team-member name.\n\n4. Add Lead Relay to your phone Home Screen:\n- iPhone: open the link in Safari, tap Share, then Add to Home Screen. Push notifications must be enabled from the Home Screen app, not an ordinary Safari tab.\n- Android: open the link in Chrome, tap the menu, then Add to Home screen or Install app.\n\n5. Open Lead Relay from the Home Screen, go to Settings, and tap Enable push alerts. When your phone asks whether to allow notifications, choose Allow.\n\n6. Wait for the message that push alerts were enabled for your name, then tap Send test push. You should receive a Lead Relay test notification.\n\n7. Make sure your team status in Lead Relay is Available or On call so you receive new-lead alerts.\n\nIf an iPhone does not show the alert, open iPhone Settings > Notifications > Lead Relay and make sure Allow Notifications is turned on.\n\nWhen a real lead arrives, open the notification and claim it if you are the first available person to respond.\n\nThanks!`;
 }
 
 function sendTeamInvite(memberId) {
@@ -2027,7 +2046,7 @@ function matchTeamMember(value) {
     String(entry.email || "").toLowerCase() === normalized ||
     String(entry.phone || "").replace(/\D/g, "") === normalized.replace(/\D/g, "")
   ));
-  return member?.name || value;
+  return member?.name || "";
 }
 
 function normalizeLeadStatus(value) {
@@ -2071,6 +2090,7 @@ function leadFromCsvRow(row, headerMap, importOwner = "") {
   const fullName = rowValue(row, headerMap, ["name", "lead name", "contact name", "client"]);
   const status = rowValue(row, headerMap, ["status", "lead status", "stage"]);
   const owner = rowValue(row, headerMap, ["owner", "agent", "assigned to", "assigned agent", "user", "claimed by"]);
+  const claimAssignment = normalizeClaimAssignment(normalizeLeadStatus(status), importOwner || matchTeamMember(owner));
   return {
     id: Date.now() + Math.floor(Math.random() * 100000),
     source: rowValue(row, headerMap, ["source", "lead source", "provider"]) || "FiveStreet",
@@ -2081,8 +2101,8 @@ function leadFromCsvRow(row, headerMap, importOwner = "") {
     property: rowValue(row, headerMap, ["property", "address", "listing", "area", "city"]),
     price: rowValue(row, headerMap, ["price", "price range", "listing price"]),
     urgency: normalizeUrgency(rowValue(row, headerMap, ["urgency", "priority", "temperature"]), status),
-    status: normalizeLeadStatus(status),
-    assignedTo: importOwner || matchTeamMember(owner),
+    status: claimAssignment.status,
+    assignedTo: claimAssignment.assignedTo,
     nextFollowUpDate: normalizeCsvDate(rowValue(row, headerMap, ["next follow up", "next follow-up", "follow up date", "follow-up date", "next task date"])),
     firstAttemptedAt: normalizeCsvDate(rowValue(row, headerMap, ["first attempted", "contact attempted", "first contact attempted"])),
     firstContactedAt: normalizeCsvDate(rowValue(row, headerMap, ["first contacted", "contact made", "first contact made"])),
