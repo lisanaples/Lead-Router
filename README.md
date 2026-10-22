@@ -19,6 +19,8 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Extracts Facebook campaign lead names and property/area values without copying the surrounding email sentence or campaign-volume label.
 - Uses a darker, richer dashboard palette with lead names as the main tile element and dashboard lists sorted from hot to cold.
 - Recognizes conversational intake wording such as “My name is Fake Buyer” when extracting a lead name.
+- Recognizes conversational names even when the name starts on the following line.
+- Recognizes natural introductions using “I’m …” while avoiding intent phrases such as “I’m interested in …”.
 - Downloads lead CSV files by owner/team member.
 - Shows an owner workflow with daily contacts and a hot-to-cold pipeline.
 - Adds a My Leads view for the selected team member.

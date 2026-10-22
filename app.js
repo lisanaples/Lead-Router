@@ -1753,10 +1753,14 @@ function lineValueAfterLabel(lines, labels) {
 }
 
 function extractLeadName(lines) {
-  const conversationalName = lines.map(plainLeadLine).map((line) => (
-    line.match(/\bmy name is\s+(.+?)(?=\s+and\s+my\b|[.!?](?:\s|$)|$)/i)?.[1] || ""
-  )).find(Boolean);
-  if (conversationalName) return formatContactName(conversationalName);
+  const conversationalText = lines.map(plainLeadLine).join(" ").replace(/\s+/g, " ");
+  const statedName = conversationalText.match(/\bmy name is\s+(.+?)(?=\s+and\s+my\b|[.!?](?:\s|$)|$)/i)?.[1] || "";
+  if (statedName) return formatContactName(statedName);
+  const introducedName = conversationalText.match(/\bi(?:'|’)m\s+(.+?)(?=[.!?](?:\s|$)|$)/i)?.[1]?.trim() || "";
+  const introductionWords = introducedName.split(/\s+/).filter(Boolean);
+  const looksLikeIntent = /^(interested|looking|searching|wanting|trying|hoping|ready|thinking|buying|selling|checking|inquiring)\b/i.test(introducedName);
+  const looksLikeName = introductionWords.length >= 1 && introductionWords.length <= 5 && introductionWords.every((word) => /^[A-Za-z][A-Za-z.'-]*$/.test(word));
+  if (introducedName && looksLikeName && !looksLikeIntent) return formatContactName(introducedName);
   const submittedIndex = lines.findIndex((line) => /^submitted on\b/i.test(plainLeadLine(line)));
   if (submittedIndex >= 0) {
     const submittedName = lines.slice(submittedIndex + 1).find((line) => {
