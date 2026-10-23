@@ -34,6 +34,12 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Shows persistent FiveStreet import progress, reports invalid files and browser storage errors, supports selecting the same file again, and rolls back instead of leaving a partial import.
 - Corrects the former-owner summary row loop so the supplied FiveStreet CSV reaches the review confirmation.
 - Prevents a blank team-member phone field from falsely matching a former FiveStreet owner.
+- Displays version 64 in Settings and loads a uniquely named v64 script so the deployed version can be verified without relying on browser cache.
+- Renews Supabase sessions automatically before they expire and retries once after an authentication timeout without clearing locally saved leads.
+- Forces phone launches to request the current app shell instead of reopening an older cached dashboard.
+- Uses one consistent v65 cache version for JavaScript and styles, and makes Unclaimed lead cards pulse more prominently.
+- Automatically fills the claimed date when a lead is claimed from the dashboard, a notification link, repeat-lead routing, or manual owner assignment, while preserving existing and imported claimed dates.
+- Lets the master account send numbered reminders for unclaimed leads; email, push, activity, and delivery history are labeled Second notice, Third notice, and later notice numbers, while claimed leads are protected from reminder broadcasts.
 - Imports the supplied FiveStreet Agent 2 owner fields, full property address, property price, original received date, claimed date, notes, and translated FiveStreet statuses.
 - Recognizes a leading name followed directly by intent wording, such as “Jennifer Jitters, looking for more info …”.
 - Downloads lead CSV files by owner/team member.

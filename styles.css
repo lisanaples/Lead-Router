@@ -712,12 +712,21 @@ p {
 }
 
 #dashboardView #unclaimedLeads .lead-card.status-new {
-  animation: dashboardPriorityPulse 2.2s ease-in-out infinite;
+  outline: 2px solid rgba(255, 85, 124, 0.5);
+  animation: dashboardPriorityPulse 1.55s ease-in-out infinite;
 }
 
 @keyframes dashboardPriorityPulse {
-  0%, 100% { box-shadow: 0 9px 20px rgba(0, 0, 0, 0.16); }
-  50% { box-shadow: 0 10px 26px rgba(255, 85, 124, 0.25); }
+  0%, 100% {
+    outline-color: rgba(255, 85, 124, 0.42);
+    box-shadow: 0 9px 20px rgba(0, 0, 0, 0.16);
+    transform: scale(1);
+  }
+  50% {
+    outline-color: rgba(255, 85, 124, 0.95);
+    box-shadow: 0 10px 30px rgba(255, 85, 124, 0.42);
+    transform: scale(1.012);
+  }
 }
 
 .lead-main span {

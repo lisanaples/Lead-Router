@@ -1,9 +1,7 @@
-const CACHE_NAME = "lead-router-v63";
+const CACHE_NAME = "lead-router-v67";
 const APP_SHELL = [
-  "./",
-  "index.html",
-  "styles.css?v=58",
-  "app.js?v=63",
+  "styles.css?v=67",
+  "app-v67.js?v=67",
   "assets/lead-router-icon.svg",
   "manifest.webmanifest"
 ];
@@ -36,7 +34,10 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put("index.html", copy));
           return response;
         })
-        .catch(() => caches.match("index.html"))
+        .catch(() => new Response("Lead Relay needs an internet connection to open the latest version.", {
+          status: 503,
+          headers: { "Content-Type": "text/plain; charset=utf-8" },
+        }))
     );
     return;
   }

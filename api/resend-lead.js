@@ -9,6 +9,14 @@ const {
   verifyUserToken,
 } = require("./_lead-router-lib");
 
+function noticeLabel(number) {
+  const words = { 2: "Second notice", 3: "Third notice", 4: "Fourth notice", 5: "Fifth notice" };
+  if (words[number]) return words[number];
+  const remainder = number % 100;
+  const suffix = remainder >= 11 && remainder <= 13 ? "th" : ({ 1: "st", 2: "nd", 3: "rd" }[number % 10] || "th");
+  return `${number}${suffix} notice`;
+}
+
 module.exports = async function handler(request, response) {
   if (handleOptions(request, response)) return;
 
@@ -27,9 +35,16 @@ module.exports = async function handler(request, response) {
       response.status(404).json({ ok: false, error: "That lead was not found." });
       return;
     }
+    if (lead.status !== "new" || String(lead.assignedTo || "").trim()) {
+      response.status(409).json({ ok: false, error: `${lead.name} is already claimed. No reminder was sent.` });
+      return;
+    }
 
-    const notifications = await notifyActiveTeam(workspace, lead);
-    recordNotificationDelivery(lead, notifications, "Notifications resent");
+    const reminderNumber = Number(lead.reminderNoticeCount || 0) + 1;
+    const label = noticeLabel(reminderNumber + 1);
+    const notifications = await notifyActiveTeam(workspace, lead, { noticeLabel: label });
+    lead.reminderNoticeCount = reminderNumber;
+    recordNotificationDelivery(lead, notifications, label);
     const summary = {
       eligible: notifications.length,
       emailsSent: notifications.filter((entry) => entry.email).length,
@@ -42,12 +57,12 @@ module.exports = async function handler(request, response) {
     lead.activity = Array.isArray(lead.activity) ? lead.activity : [];
     lead.activity.unshift({
       at: new Date().toISOString(),
-      text: `Notifications resent to ${summary.eligible} eligible team member(s): ${summary.emailsSent} email(s), ${summary.pushesSent} phone push(es).`,
+      text: `${label} sent to ${summary.eligible} eligible team member(s): ${summary.emailsSent} email(s), ${summary.pushesSent} phone push(es).`,
     });
     lead.updatedAt = new Date().toISOString();
     await saveWorkspace(workspace);
 
-    response.status(200).json({ ok: true, leadId: lead.id, notifications, summary });
+    response.status(200).json({ ok: true, leadId: lead.id, noticeLabel: label, notifications, summary });
   } catch (error) {
     response.status(500).json({ ok: false, error: error.message });
   }

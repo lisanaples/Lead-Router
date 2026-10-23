@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=45" />
+    <link rel="stylesheet" href="styles.css?v=67" />
   </head>
   <body>
     <main class="app-shell">
@@ -329,6 +329,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
+              <p><strong>Lead Relay version 67</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -480,7 +481,7 @@
         </section>
         <div class="dialog-actions">
           <button class="danger-button hidden" type="button" id="archiveLeadButton">Archive lead</button>
-          <button class="ghost-button hidden" type="button" id="resendLeadButton">Resend notifications</button>
+          <button class="ghost-button hidden" type="button" id="resendLeadButton">Send reminder</button>
           <button class="primary-button" type="button" data-close-dialog>Done</button>
         </div>
       </form>
@@ -527,7 +528,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=63"></script>
+    <script src="app-v67.js?v=67"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

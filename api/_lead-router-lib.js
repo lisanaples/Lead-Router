@@ -255,6 +255,7 @@ function routeRepeatLead(workspace, lead) {
   if (!previous) return null;
   lead.assignedTo = previous.assignedTo;
   lead.status = "claimed";
+  lead.claimedAt = lead.claimedAt || dateKey();
   lead.isRepeat = true;
   lead.repeatOfLeadId = previous.id;
   lead.activity.unshift({
@@ -336,8 +337,9 @@ function claimUrl(lead, member) {
   return url.toString();
 }
 
-function notificationText(lead, member) {
+function notificationText(lead, member, noticeLabel = "") {
   return [
+    noticeLabel ? `${noticeLabel}: this lead is still unclaimed.` : "",
     `${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.source} ${lead.type} inquiry from ${lead.name}`,
     lead.isRepeat ? `This person previously inquired and is already assigned to you.` : "",
     lead.property ? `Property/area: ${lead.property}` : "",
@@ -346,7 +348,7 @@ function notificationText(lead, member) {
   ].filter(Boolean).join("\n");
 }
 
-async function sendEmail(member, lead) {
+async function sendEmail(member, lead, noticeLabel = "") {
   const apiKey = optionalEnv("RESEND_API_KEY");
   const from = optionalEnv("EMAIL_FROM");
   if (!apiKey || !from || !member.email) return { sent: false, skipped: "Email is not configured." };
@@ -360,9 +362,10 @@ async function sendEmail(member, lead) {
     body: JSON.stringify({
       from,
       to: member.email,
-      subject: `${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.name} (${lead.source})`,
-      text: notificationText(lead, member),
+      subject: `${noticeLabel ? `${noticeLabel}: ` : ""}${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.name} (${lead.source})`,
+      text: notificationText(lead, member, noticeLabel),
       html: `
+        ${noticeLabel ? `<h2>${noticeLabel}: This lead is still unclaimed</h2>` : ""}
         <h2>${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.source} ${lead.type} inquiry</h2>
         ${lead.isRepeat ? `<p><strong>This person previously inquired and is already assigned to you.</strong></p>` : ""}
         <p><strong>${lead.name}</strong></p>
@@ -378,7 +381,7 @@ async function sendEmail(member, lead) {
   return { sent: true };
 }
 
-async function sendPush(member, lead, workspace) {
+async function sendPush(member, lead, workspace, noticeLabel = "") {
   const publicKey = optionalEnv("VAPID_PUBLIC_KEY");
   const privateKey = optionalEnv("VAPID_PRIVATE_KEY");
   const subject = optionalEnv("VAPID_SUBJECT") || "mailto:lead-router@example.com";
@@ -389,8 +392,8 @@ async function sendPush(member, lead, workspace) {
   let sent = 0;
   for (const subscription of subscriptions) {
     await webPush.sendNotification(subscription, JSON.stringify({
-      title: `${lead.isRepeat ? "Repeat" : "New"} ${lead.source} lead`,
-      body: `${lead.name}${lead.isRepeat ? " - previously assigned to you" : ""}${lead.property ? ` - ${lead.property}` : ""}`,
+      title: `${noticeLabel ? `${noticeLabel}: ` : ""}${lead.isRepeat ? "Repeat" : "New"} ${lead.source} lead`,
+      body: `${lead.name}${noticeLabel ? " - still unclaimed" : ""}${lead.isRepeat ? " - previously assigned to you" : ""}${lead.property ? ` - ${lead.property}` : ""}`,
       url: lead.isRepeat ? appUrl() : claimUrl(lead, member),
     }));
     sent += 1;
@@ -411,7 +414,8 @@ async function sendTestPush(owner, workspace) {
   return sendPush(member, lead, workspace);
 }
 
-async function notifyActiveTeam(workspace, lead) {
+async function notifyActiveTeam(workspace, lead, options = {}) {
+  const noticeLabel = String(options.noticeLabel || "").trim();
   const results = [];
   const recipients = lead.isRepeat && lead.assignedTo
     ? (workspace.team || []).filter((member) => member.name === lead.assignedTo)
@@ -419,14 +423,14 @@ async function notifyActiveTeam(workspace, lead) {
   for (const member of recipients) {
     const memberResult = { member: member.name, email: false, push: false };
     try {
-      const emailResult = await sendEmail(member, lead);
+      const emailResult = await sendEmail(member, lead, noticeLabel);
       memberResult.email = Boolean(emailResult.sent);
       if (emailResult.skipped) memberResult.emailSkipped = emailResult.skipped;
     } catch (error) {
       memberResult.emailError = error.message;
     }
     try {
-      const pushResult = await sendPush(member, lead, workspace);
+      const pushResult = await sendPush(member, lead, workspace, noticeLabel);
       memberResult.push = Boolean(pushResult.sent);
       if (pushResult.count) memberResult.pushCount = pushResult.count;
       if (pushResult.skipped) memberResult.pushSkipped = pushResult.skipped;
@@ -467,6 +471,7 @@ function claimLead(workspace, leadId, owner) {
   if (lead.status !== "new") return { ok: false, error: `${lead.name} has already been claimed by ${lead.assignedTo || "another team member"}.` };
   lead.status = "claimed";
   lead.assignedTo = member.name;
+  lead.claimedAt = lead.claimedAt || dateKey();
   lead.firstAttemptedAt = lead.firstAttemptedAt || dateKey();
   lead.updatedAt = new Date().toISOString();
   lead.activity = Array.isArray(lead.activity) ? lead.activity : [];
