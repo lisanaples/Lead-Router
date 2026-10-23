@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=67" />
+    <link rel="stylesheet" href="styles.css?v=70" />
   </head>
   <body>
     <main class="app-shell">
@@ -190,7 +190,7 @@
           <section class="panel">
             <div class="panel-header">
               <div>
-                <span class="eyebrow">All leads</span>
+                <span class="eyebrow">Find and manage</span>
                 <h2>Lead Inbox</h2>
               </div>
               <div class="filter-row">
@@ -216,7 +216,18 @@
                 </select>
               </div>
             </div>
+            <div class="inbox-view-tabs" aria-label="Lead inbox views">
+              <button class="inbox-view-tab" type="button" data-inbox-view="attention">Needs attention</button>
+              <button class="inbox-view-tab" type="button" data-inbox-view="oldUnclaimed">Old unclaimed leads</button>
+              <button class="inbox-view-tab active" type="button" data-inbox-view="active">Active leads</button>
+              <button class="inbox-view-tab" type="button" data-inbox-view="closed">Closed / final</button>
+              <button class="inbox-view-tab" type="button" data-inbox-view="archive">Search archives</button>
+            </div>
+            <div class="inbox-list-header" aria-hidden="true">
+              <span>Lead</span><span>Status</span><span>Owner</span><span>Received</span><span>Property / source</span>
+            </div>
             <div class="lead-table" id="leadTable"></div>
+            <div class="inbox-pagination" id="inboxPagination"></div>
           </section>
         </section>
 
@@ -329,7 +340,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 67</strong></p>
+              <p><strong>Lead Relay version 70</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -528,7 +539,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v67.js?v=67"></script>
+    <script src="app-v70.js?v=70"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

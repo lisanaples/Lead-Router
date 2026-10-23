@@ -19,6 +19,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Extracts Facebook campaign lead names and property/area values without copying the surrounding email sentence or campaign-volume label.
 - Uses a darker, richer dashboard palette with lead names as the main tile element and dashboard lists sorted from hot to cold.
 - Recognizes conversational intake wording such as “My name is Fake Buyer” when extracting a lead name.
+- Uses labeled first/last names, conversational introductions, leading names, sender display names, submitted-name blocks, and email names to identify pasted lead names more reliably.
 - Recognizes conversational names even when the name starts on the following line.
 - Recognizes natural introductions using “I’m …” while avoiding intent phrases such as “I’m interested in …”.
 - Adds a Cancel / start over button that clears the pasted intake, preview form, and current draft.
@@ -40,6 +41,9 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Uses one consistent v65 cache version for JavaScript and styles, and makes Unclaimed lead cards pulse more prominently.
 - Automatically fills the claimed date when a lead is claimed from the dashboard, a notification link, repeat-lead routing, or manual owner assignment, while preserving existing and imported claimed dates.
 - Lets the master account send numbered reminders for unclaimed leads; email, push, activity, and delivery history are labeled Second notice, Third notice, and later notice numbers, while claimed leads are protected from reminder broadcasts.
+- Replaces the large Lead Inbox tile grid with compact responsive rows, quick Active/Needs attention/Closed/Archive views, active-only default searching, and 50-lead pagination.
+- Keeps archived leads invisible unless Search archives is selected and limits dashboard lists to 20 items with full-count View all links.
+- Separates historical unclaimed FiveStreet imports into Old unclaimed leads; only newly received unclaimed leads pulse.
 - Imports the supplied FiveStreet Agent 2 owner fields, full property address, property price, original received date, claimed date, notes, and translated FiveStreet statuses.
 - Recognizes a leading name followed directly by intent wording, such as “Jennifer Jitters, looking for more info …”.
 - Downloads lead CSV files by owner/team member.
