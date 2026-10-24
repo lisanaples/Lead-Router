@@ -1,7 +1,8 @@
-const CACHE_NAME = "lead-router-v70";
+const CACHE_NAME = "lead-router-v73";
 const APP_SHELL = [
-  "styles.css?v=70",
-  "app-v70.js?v=70",
+  "./",
+  "styles.css?v=73",
+  "app-v73.js?v=73",
   "assets/lead-router-icon.svg",
   "manifest.webmanifest"
 ];
@@ -28,28 +29,28 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request, { cache: "no-store" })
+      fetch(event.request, { cache: "reload" })
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put("index.html", copy));
           return response;
         })
-        .catch(() => new Response("Lead Relay needs an internet connection to open the latest version.", {
+        .catch(() => caches.match("./").then((cached) => cached || new Response("Lead Relay needs an internet connection to open the latest installed version.", {
           status: 503,
           headers: { "Content-Type": "text/plain; charset=utf-8" },
-        }))
+        })))
     );
     return;
   }
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "reload" })
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         return response;
       })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("index.html")))
+      .catch(() => caches.match(event.request))
   );
 });
 

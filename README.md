@@ -20,6 +20,10 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Uses a darker, richer dashboard palette with lead names as the main tile element and dashboard lists sorted from hot to cold.
 - Recognizes conversational intake wording such as “My name is Fake Buyer” when extracting a lead name.
 - Uses labeled first/last names, conversational introductions, leading names, sender display names, submitted-name blocks, and email names to identify pasted lead names more reliably.
+- Retroactively restores missing claim dates from timestamped claim-history entries and saves the recovered dates to the shared workspace.
+- Correctly combines labeled Facebook first and last names and prioritizes the prospect's labeled email/phone over sender headers.
+- Refreshes the installed phone app shell without reusing an obsolete cached page or substituting HTML when a script is unavailable.
+- Adds a clickable Recently Received dashboard section, newest first, so warm or already-claimed arrivals cannot be buried by temperature sorting.
 - Recognizes conversational names even when the name starts on the following line.
 - Recognizes natural introductions using “I’m …” while avoiding intent phrases such as “I’m interested in …”.
 - Adds a Cancel / start over button that clears the pasted intake, preview form, and current draft.

@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=70" />
+    <link rel="stylesheet" href="styles.css?v=73" />
   </head>
   <body>
     <main class="app-shell">
@@ -108,6 +108,18 @@
                 <span class="count-pill" id="claimedCount">0</span>
               </div>
               <div class="lead-list compact" id="claimedLeads"></div>
+            </article>
+
+            <article class="panel recent-dashboard-panel">
+              <div class="panel-header">
+                <div>
+                  <span class="eyebrow">Last 7 days</span>
+                  <h2>Recently Received</h2>
+                  <p>Newest first · tap any lead to open it</p>
+                </div>
+                <span class="count-pill" id="recentLeadCount">0</span>
+              </div>
+              <div class="lead-list compact" id="recentLeads"></div>
             </article>
           </section>
 
@@ -340,7 +352,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 70</strong></p>
+              <p><strong>Lead Relay version 73</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -539,14 +551,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v70.js?v=70"></script>
+    <script src="app-v73.js?v=73"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js").then((registration) => {
+        navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;

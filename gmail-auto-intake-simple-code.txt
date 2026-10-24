@@ -65,6 +65,9 @@ function threadHasLabel(thread, labelName) {
 }
 
 function guessSource(text) {
+  if (/facebook ads campaign/i.test(text)) {
+    return "Facebook";
+  }
   if (/zillow/i.test(text)) {
     return "Zillow";
   }
@@ -74,7 +77,7 @@ function guessSource(text) {
   if (/homes/i.test(text)) {
     return "Homes.com";
   }
-  if (/reminder media/i.test(text)) {
+  if (/reminder\s*media/i.test(text)) {
     return "Reminder Media";
   }
   if (/homesale/i.test(text)) {

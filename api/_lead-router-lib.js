@@ -106,6 +106,10 @@ function lineValueAfterLabel(lines, labels) {
 }
 
 function extractLeadName(lines) {
+  const firstName = lineValueAfterLabel(lines, ["first name", "firstname"]);
+  const lastName = lineValueAfterLabel(lines, ["last name", "lastname", "surname"]);
+  const combinedName = formatContactName([firstName, lastName].filter(Boolean).join(" "));
+  if (combinedName) return combinedName;
   const conversationalText = lines.map(plainLeadLine).join(" ").replace(/\s+/g, " ");
   const leadingName = conversationalText.match(/^([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){1,4}),\s+(?=I\b|I['’](?:m|ve|d|ll)\b|my\b|looking\b|interested\b|wants?\b|needs?\b|asking\b|inquiring\b|would like\b)/i)?.[1] || "";
   if (leadingName) return formatContactName(leadingName);
@@ -179,11 +183,26 @@ function extractPropertyArea(text, lines) {
   return expandedStreetAddress(plainLeadLine(propertyLine).replace(/^(property|address|home|listing|interested in):/i, "").trim());
 }
 
+function extractProspectEmail(text, lines) {
+  const labeled = lineValueAfterLabel(lines, ["email address", "email"]);
+  const labeledEmail = String(labeled || "").match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+  if (labeledEmail) return labeledEmail;
+  const addresses = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+  return addresses.find((address) => !/^(clientsuccess|notifications?|noreply|no-reply|support|unsubscribe)@/i.test(address)) || addresses[0] || "";
+}
+
+function extractProspectPhone(text, lines) {
+  const labeled = lineValueAfterLabel(lines, ["phone number", "phone", "mobile", "cell"]);
+  return String(labeled || "").match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0]
+    || text.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0]
+    || "";
+}
+
 function parseLeadEmail(text = "") {
   const lines = text.split(/\n+/).map((line) => line.trim()).filter(Boolean);
-  const email = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
-  const phone = text.match(/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/)?.[0] || "";
-  const source = /facebook ads campaign/i.test(text) ? "Facebook" : /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
+  const email = extractProspectEmail(text, lines);
+  const phone = extractProspectPhone(text, lines);
+  const source = /facebook ads campaign/i.test(text) ? "Facebook" : /zillow/i.test(text) ? "Zillow" : /realtor\.com/i.test(text) ? "Realtor.com" : /homes\.com/i.test(text) ? "Homes.com" : /reminder\s*media/i.test(text) ? "Reminder Media" : /homesale/i.test(text) ? "HomeSale.com" : "Website";
   return {
     source,
     type: /sell|seller|valuation|home value/i.test(text) ? "Seller" : "Buyer",
@@ -200,7 +219,10 @@ function parseLeadEmail(text = "") {
 function leadFromPayload(payload) {
   const rawText = payload.raw || payload.text || payload.body || payload.message || "";
   const parsed = rawText ? parseLeadEmail(rawText) : {};
-  const source = payload.source || payload.provider || parsed.source || "Website";
+  const suppliedSource = payload.source || payload.provider || "";
+  const source = (/^(email lead|website)$/i.test(suppliedSource) && parsed.source && parsed.source !== "Website")
+    ? parsed.source
+    : suppliedSource || parsed.source || "Website";
   const type = payload.type || payload.lead_type || parsed.type || "Buyer";
   const name = payload.name || payload.full_name || payload.client || parsed.name || "New Lead";
   return {
