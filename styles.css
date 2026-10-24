@@ -421,7 +421,7 @@ p {
 
 .desk-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -733,16 +733,10 @@ p {
   background: linear-gradient(145deg, #255b7b, #17394f);
 }
 
-#dashboardView > .desk-layout > .panel:first-child,
-#dashboardView > .desk-layout > .panel:nth-child(2),
-#dashboardView .recent-dashboard-panel {
+#dashboardView > .desk-layout > .panel {
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(145deg, #172c3d, #0d1f2d);
   box-shadow: 0 20px 44px rgba(8, 24, 38, 0.2);
-}
-
-#dashboardView .recent-dashboard-panel {
-  grid-column: 1 / -1;
 }
 
 #dashboardView .panel-header h2 {
