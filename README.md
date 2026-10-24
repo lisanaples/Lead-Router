@@ -25,6 +25,7 @@ This is a separate prototype for a FiveStreet-style real estate lead routing app
 - Refreshes the installed phone app shell without reusing an obsolete cached page or substituting HTML when a script is unavailable.
 - Adds a clickable Recently Received dashboard section, newest first, so warm or already-claimed arrivals cannot be buried by temperature sorting.
 - Places Unclaimed, Recently Received, and Claimed Leads side by side on desktop, while preserving that order when stacked on phones.
+- Uses the same dark, high-contrast panel treatment for all three dashboard columns, with distinct accent borders.
 - Recognizes conversational names even when the name starts on the following line.
 - Recognizes natural introductions using “I’m …” while avoiding intent phrases such as “I’m interested in …”.
 - Adds a Cancel / start over button that clears the pasted intake, preview form, and current draft.

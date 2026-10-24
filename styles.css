@@ -426,10 +426,10 @@ p {
 }
 
 #dashboardView > .desk-layout > .panel:first-child {
-  border-color: rgba(229, 72, 123, 0.28);
+  border-color: rgba(255, 85, 124, 0.42);
   background:
-    radial-gradient(circle at top right, rgba(229, 72, 123, 0.08), transparent 42%),
-    rgba(255, 255, 255, 0.94);
+    radial-gradient(circle at top right, rgba(229, 72, 123, 0.14), transparent 42%),
+    linear-gradient(145deg, #172c3d, #0d1f2d);
 }
 
 #dashboardView > .desk-layout > .panel:first-child .count-pill {
@@ -438,10 +438,10 @@ p {
 }
 
 #dashboardView > .desk-layout > .panel:nth-child(2) {
-  border-color: rgba(18, 56, 73, 0.16);
+  border-color: rgba(32, 191, 212, 0.32);
   background:
-    radial-gradient(circle at top right, rgba(32, 191, 212, 0.08), transparent 42%),
-    rgba(255, 255, 255, 0.94);
+    radial-gradient(circle at top right, rgba(32, 191, 212, 0.14), transparent 42%),
+    linear-gradient(145deg, #172c3d, #0d1f2d);
 }
 
 .lead-list {
