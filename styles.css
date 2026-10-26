@@ -1481,6 +1481,72 @@ p {
   line-height: 1.45;
 }
 
+.lead-name-with-counter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.contact-attempt-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: inherit;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.last-contact-attempt {
+  margin-top: 4px;
+  font-size: 0.76rem;
+  opacity: 0.88;
+}
+
+.contact-attempt-button {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  background: white;
+  color: var(--teal-dark);
+  font-weight: 900;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.contact-attempt-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 10px;
+  background: #eef5f5;
+  border: 1px solid var(--line);
+}
+
+.contact-attempt-summary > div {
+  display: grid;
+  gap: 4px;
+}
+
+.contact-attempt-summary span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+@media (max-width: 640px) {
+  .contact-attempt-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .draft-groups {
   display: grid;
   gap: 10px;

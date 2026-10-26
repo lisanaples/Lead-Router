@@ -1,8 +1,8 @@
 const LEAD_ROUTER_WEBHOOK = "https://lead-router-29yb.vercel.app/api/inbound-lead?secret=PASTE_YOUR_SECRET_HERE";
 
-const INTAKE_LABEL = "Lead Relay Intake";
-const PROCESSED_LABEL = "Lead Relay Processed";
-const ERROR_LABEL = "Lead Relay Error";
+const INTAKE_LABEL = "Lead Router Intake";
+const PROCESSED_LABEL = "Lead Router Processed";
+const ERROR_LABEL = "Lead Router Error";
 
 function sendLeadEmailsToLeadRouter() {
   var intakeLabel = GmailApp.getUserLabelByName(INTAKE_LABEL);
@@ -16,10 +16,6 @@ function sendLeadEmailsToLeadRouter() {
 
   for (var i = 0; i < threads.length; i++) {
     var thread = threads[i];
-    if (threadHasLabel(thread, PROCESSED_LABEL)) {
-      continue;
-    }
-
     var messages = thread.getMessages();
     var message = messages[messages.length - 1];
     var body = message.getPlainBody();
@@ -52,16 +48,6 @@ function sendLeadEmailsToLeadRouter() {
 
 function getOrCreateLabel(name) {
   return GmailApp.getUserLabelByName(name) || GmailApp.createLabel(name);
-}
-
-function threadHasLabel(thread, labelName) {
-  var labels = thread.getLabels();
-  for (var i = 0; i < labels.length; i++) {
-    if (labels[i].getName() === labelName) {
-      return true;
-    }
-  }
-  return false;
 }
 
 function guessSource(text) {

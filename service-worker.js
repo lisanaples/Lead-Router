@@ -1,8 +1,8 @@
-const CACHE_NAME = "lead-router-v75";
+const CACHE_NAME = "lead-router-v79";
+const OFFLINE_PAGE = "offline-index-v79";
 const APP_SHELL = [
-  "./",
-  "styles.css?v=75",
-  "app-v75.js?v=75",
+  "styles.css?v=79",
+  "app-v79.js?v=79",
   "assets/lead-router-icon.svg",
   "manifest.webmanifest"
 ];
@@ -10,7 +10,11 @@ const APP_SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then(async (cache) => {
+        await cache.addAll(APP_SHELL);
+        const response = await fetch("./", { cache: "no-store" });
+        if (response.ok) await cache.put(OFFLINE_PAGE, response);
+      })
       .then(() => self.skipWaiting())
   );
 });
@@ -29,13 +33,13 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request, { cache: "reload" })
+      fetch(event.request, { cache: "no-store" })
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("index.html", copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(OFFLINE_PAGE, copy));
           return response;
         })
-        .catch(() => caches.match("./").then((cached) => cached || new Response("Lead Relay needs an internet connection to open the latest installed version.", {
+        .catch(() => caches.match(OFFLINE_PAGE).then((cached) => cached || new Response("Lead Relay needs an internet connection to open the latest installed version.", {
           status: 503,
           headers: { "Content-Type": "text/plain; charset=utf-8" },
         })))
@@ -44,7 +48,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    fetch(event.request, { cache: "reload" })
+    fetch(event.request, { cache: "no-store" })
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));

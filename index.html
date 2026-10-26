@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=75" />
+    <link rel="stylesheet" href="styles.css?v=79" />
   </head>
   <body>
     <main class="app-shell">
@@ -434,6 +434,13 @@
             <h3>Response tracking</h3>
             <span>Milestones</span>
           </div>
+          <div class="contact-attempt-summary">
+            <div>
+              <strong id="contactAttemptCount">0 contact attempts</strong>
+              <span id="lastContactAttempt">No contact attempt logged yet</span>
+            </div>
+            <button class="primary-button" type="button" id="logContactAttemptButton">+ Add contact attempt</button>
+          </div>
           <div class="form-grid">
             <label>First contact attempted <input name="firstAttemptedAt" type="date" /></label>
             <label>Claimed date <input name="claimedAt" type="date" /></label>
@@ -464,6 +471,16 @@
           </div>
           <div class="draft-groups">
             <div>
+              <strong>Property showing texts</strong>
+              <div class="button-row">
+                <button class="ghost-button" type="button" data-draft-type="tour-when">When would you like to see it?</button>
+                <button class="ghost-button" type="button" data-draft-type="tour-today-tomorrow">Today or tomorrow?</button>
+                <button class="ghost-button" type="button" data-draft-type="tour-best-time">What time works best?</button>
+                <button class="ghost-button" type="button" data-draft-type="tour-weekend">Weekend showing</button>
+                <button class="ghost-button" type="button" data-draft-type="tour-follow-up">Still want to tour?</button>
+              </div>
+            </div>
+            <div>
               <strong>Buyer leads</strong>
               <div class="button-row">
                 <button class="ghost-button" type="button" data-draft-type="buyer-text">Quick buyer text</button>
@@ -492,6 +509,7 @@
           <textarea id="engagementDraft" readonly placeholder="Choose a draft to prepare a message for this lead."></textarea>
           <div class="button-row">
             <button class="ghost-button" type="button" id="copyDraftButton">Copy draft</button>
+            <button class="primary-button" type="button" id="openTextDraftButton">Open text message</button>
             <button class="ghost-button" type="button" id="openEmailDraftButton">Open email</button>
           </div>
         </section>
@@ -551,14 +569,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v75.js?v=75"></script>
+    <script src="app-v79.js?v=79"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=79", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;
