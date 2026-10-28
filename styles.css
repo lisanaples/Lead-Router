@@ -20,9 +20,9 @@
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(217, 164, 65, 0.16), transparent 34%),
-    linear-gradient(135deg, rgba(18, 56, 73, 0.08), rgba(217, 164, 65, 0.09)),
-    #f5f8f8;
+    linear-gradient(135deg, rgba(6, 31, 43, 0.62), rgba(15, 48, 57, 0.42)),
+    url("assets/lead-relay-background.png") center center / cover fixed no-repeat,
+    #123849;
   color: var(--ink);
 }
 
@@ -124,6 +124,9 @@ button {
 .main {
   min-width: 0;
   padding: 28px;
+  background: rgba(239, 244, 243, 0.82);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .topbar,
@@ -347,6 +350,29 @@ p {
   position: relative;
   overflow: hidden;
   padding: 14px;
+}
+
+.metric-card-clickable {
+  width: 100%;
+  min-height: 0;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.metric-card-clickable:hover,
+.metric-card-clickable:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--rose);
+  box-shadow: 0 14px 28px rgba(123, 22, 52, 0.18);
+  outline: none;
+}
+
+.metric-card-clickable:active {
+  transform: translateY(0);
 }
 
 .metric-card::before {
