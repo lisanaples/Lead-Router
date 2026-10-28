@@ -1348,6 +1348,64 @@ function renderDeliveryHistory(lead = {}) {
   }).join("") : emptyState("No detailed delivery history yet. Use Resend notifications to create one for this lead.");
 }
 
+function duplicateCandidates(lead) {
+  if (!lead?.id) return [];
+  const email = String(lead.email || "").trim().toLowerCase();
+  const phone = String(lead.phone || "").replace(/\D/g, "").slice(-10);
+  const name = String(lead.name || "").trim().toLowerCase();
+  return leads.filter((other) => {
+    if (String(other.id) === String(lead.id) || other.status === "archived" || other.mergedInto) return false;
+    return Boolean((email && String(other.email || "").trim().toLowerCase() === email) ||
+      (phone.length === 10 && String(other.phone || "").replace(/\D/g, "").slice(-10) === phone) ||
+      (name.length > 4 && String(other.name || "").trim().toLowerCase() === name));
+  });
+}
+
+function renderDuplicateMergeOptions(lead) {
+  const section = document.querySelector("#mergeLeadSection");
+  const select = document.querySelector("#mergeLeadTarget");
+  const matches = duplicateCandidates(lead);
+  section.classList.toggle("hidden", !lead || !matches.length || lead.status === "archived");
+  select.innerHTML = '<option value="">Select duplicate record...</option>' +
+    matches.map((other) => `<option value="${escapeAttr(String(other.id))}">${escapeHtml(other.name)} — ${escapeHtml(other.email || other.phone || other.source || "No contact details")}</option>`).join("");
+}
+
+function mergeDuplicateLead() {
+  window.clearTimeout(leadFormAutoSaveTimer);
+  const form = document.querySelector("#leadForm");
+  const primary = leads.find((lead) => String(lead.id) === String(form.elements.leadId.value));
+  const secondary = leads.find((lead) => String(lead.id) === document.querySelector("#mergeLeadTarget").value);
+  if (!primary || !secondary || primary === secondary || !duplicateCandidates(primary).includes(secondary)) {
+    showToast("Select a matching duplicate lead first.");
+    return;
+  }
+  if (!window.confirm(`Merge ${secondary.name} into ${primary.name}? This lead stays active; the duplicate will be archived and its notes and history preserved.`)) return;
+  // Preserve edits to the active record before combining histories.
+  saveLead(form, { activity: false, silent: true });
+  const fields = ["phone", "email", "property", "price", "message", "outcomeNotes", "nextFollowUpDate", "firstAttemptedAt", "firstContactedAt", "appointmentSetAt", "consultationCompletedAt", "convertedAt", "claimedAt"];
+  fields.forEach((field) => { if (!primary[field] && secondary[field]) primary[field] = secondary[field]; });
+  if (!primary.assignedTo && secondary.assignedTo) {
+    primary.assignedTo = secondary.assignedTo;
+    if (primary.status === "new") primary.status = "claimed";
+  }
+  primary.notes = [...(Array.isArray(primary.notes) ? primary.notes : []),
+    ...(Array.isArray(secondary.notes) ? secondary.notes : []).map((note) => ({ ...note, text: `[Merged from duplicate] ${note.text || ""}` }))];
+  primary.activity = [...(Array.isArray(primary.activity) ? primary.activity : []),
+    ...(Array.isArray(secondary.activity) ? secondary.activity : []).map((entry) => ({ ...entry, text: `[Merged duplicate] ${entry.text || ""}` }))];
+  primary.notificationHistory = [...(Array.isArray(primary.notificationHistory) ? primary.notificationHistory : []),
+    ...(Array.isArray(secondary.notificationHistory) ? secondary.notificationHistory : [])];
+  primary.contactAttempts = Number(primary.contactAttempts || 0) + Number(secondary.contactAttempts || 0);
+  primary.notes.push({ at: new Date().toISOString(), text: `Merged duplicate record #${secondary.id}. Original source: ${secondary.source || "Unknown"}; message: ${secondary.message || "None"}; property: ${secondary.property || "None"}.` });
+  secondary.status = "archived";
+  secondary.mergedInto = primary.id;
+  addActivity(secondary, `Merged into lead #${primary.id}; archived as duplicate.`);
+  addActivity(primary, `Merged duplicate lead #${secondary.id} into this record.`);
+  document.querySelector("#leadDialog").close();
+  saveAndSync({ silent: false, immediate: true });
+  renderAll();
+  showToast("Duplicate merged and archived. History preserved.");
+}
+
 function openLeadDialog(lead) {
   window.clearTimeout(leadFormAutoSaveTimer);
   fillLeadForm(lead);
@@ -1356,6 +1414,7 @@ function openLeadDialog(lead) {
   document.querySelector("#archiveLeadButton").dataset.archiveLead = lead?.id || "";
   document.querySelector("#resendLeadButton").classList.toggle("hidden", !lead);
   document.querySelector("#resendLeadButton").dataset.resendLead = lead?.id || "";
+  renderDuplicateMergeOptions(lead);
   document.querySelector("#leadDialog").showModal();
 }
 
@@ -1534,16 +1593,17 @@ function saveLead(form, options = {}) {
 }
 
 function archiveLead(leadId) {
+  window.clearTimeout(leadFormAutoSaveTimer);
   const id = Number(leadId);
   const lead = leads.find((entry) => entry.id === id);
-  if (!lead) return;
+  if (!lead) { showToast("Lead not found. Refresh and try again."); return; }
   const confirmed = window.confirm(`Archive ${lead.name || "this lead"}? You can still find it later by filtering for Archived.`);
   if (!confirmed) return;
   lead.status = "archived";
   lead.lostAt = lead.lostAt || dateKey();
   addActivity(lead, "Lead archived.");
-  saveAndSync({ silent: false });
   document.querySelector("#leadDialog")?.close();
+  saveAndSync({ silent: false });
   renderAll();
   showToast("Lead archived.");
 }
@@ -1981,12 +2041,19 @@ function resetParsedLeadIntake(options = {}) {
   if (!options.silent) showToast("Lead preview cleared. Paste another lead when ready.");
 }
 
+let parsedLeadSubmissionInProgress = false;
 async function createParsedLeadAndNotify() {
+  if (parsedLeadSubmissionInProgress) return;
   if (!parsedLeadDraft) {
     showToast("Preview a lead first.");
     return;
   }
   applyParsedLeadPreviewEdits();
+  const button = document.querySelector("#createParsedLeadButton");
+  parsedLeadSubmissionInProgress = true;
+  button.disabled = true;
+  button.textContent = "Creating and notifying...";
+  button.setAttribute("aria-busy", "true");
   try {
     const result = await authenticatedAppApiRequest("/api/manual-lead", {
       method: "POST",
@@ -1998,6 +2065,11 @@ async function createParsedLeadAndNotify() {
     showToast(`Lead created. ${notificationDeliveryText(result.notifications || [])}`);
   } catch (error) {
     showToast(`Create failed: ${error.message}`);
+  } finally {
+    parsedLeadSubmissionInProgress = false;
+    button.disabled = false;
+    button.textContent = "Create and notify";
+    button.removeAttribute("aria-busy");
   }
 }
 
@@ -2483,7 +2555,9 @@ document.addEventListener("click", (event) => {
     const dialog = closeDialogButton.closest("dialog");
     if (dialog?.id === "leadDialog") {
       window.clearTimeout(leadFormAutoSaveTimer);
+      dialog.close();
       saveLead(document.querySelector("#leadForm"), { activity: false, silent: true });
+      return;
     }
     if (dialog?.id === "teamDialog") {
       window.clearTimeout(teamFormAutoSaveTimer);
@@ -2500,6 +2574,7 @@ document.querySelector("#leadForm").addEventListener("submit", (event) => {
 document.querySelector("#leadForm").addEventListener("input", scheduleLeadFormAutoSave);
 document.querySelector("#leadForm").addEventListener("change", scheduleLeadFormAutoSave);
 document.querySelector("#addLeadNoteButton").addEventListener("click", addLeadNote);
+document.querySelector("#mergeLeadButton").addEventListener("click", mergeDuplicateLead);
 document.querySelector("#resendLeadButton").addEventListener("click", (event) => {
   resendLeadNotifications(event.currentTarget.dataset.resendLead);
 });

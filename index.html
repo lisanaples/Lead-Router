@@ -520,6 +520,13 @@
           </div>
           <div class="delivery-history" id="deliveryHistory"></div>
         </section>
+        <div id="mergeLeadSection" class="hidden">
+          <label>Merge duplicate into this lead
+            <select id="mergeLeadTarget"><option value="">Select duplicate record...</option></select>
+          </label>
+          <button class="ghost-button" type="button" id="mergeLeadButton">Merge selected duplicate</button>
+          <p>The selected duplicate is archived; its notes and activity are retained.</p>
+        </div>
         <div class="dialog-actions">
           <button class="danger-button hidden" type="button" id="archiveLeadButton">Archive lead</button>
           <button class="ghost-button hidden" type="button" id="resendLeadButton">Send reminder</button>
@@ -569,14 +576,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v79.js?v=79"></script>
+    <script src="app-v79.js?v=80"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=79", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=80", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;
