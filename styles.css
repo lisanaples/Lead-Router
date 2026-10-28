@@ -255,6 +255,13 @@ button:disabled {
   opacity: 0.55;
 }
 
+#createParsedLeadButton.processing {
+  background: #b45309;
+  border-color: #b45309;
+  color: white;
+  opacity: 1;
+}
+
 h1,
 h2,
 p {
@@ -1664,6 +1671,8 @@ dialog {
   border-radius: 12px;
   padding: 0;
   box-shadow: var(--shadow);
+  max-height: calc(100dvh - 16px);
+  overflow: hidden;
 }
 
 dialog::backdrop {
@@ -1679,6 +1688,9 @@ dialog::backdrop {
     radial-gradient(circle at top left, rgba(217, 164, 65, 0.18), transparent 32%),
     linear-gradient(135deg, rgba(18, 56, 73, 0.08), rgba(32, 191, 212, 0.08)),
     #f4f8f8;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .dialog-panel > div:first-of-type {
@@ -1706,12 +1718,20 @@ dialog::backdrop {
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  position: sticky;
+  bottom: -20px;
+  z-index: 8;
+  margin: 0 -20px -20px;
+  padding: 12px 20px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: rgba(244, 248, 248, 0.97);
 }
 
 .close-button {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  position: sticky;
+  top: 8px;
+  z-index: 10;
+  margin: -8px 0 -46px auto;
   width: 38px;
   height: 38px;
   border: 1px solid var(--line);
@@ -1719,6 +1739,15 @@ dialog::backdrop {
   background: white;
   color: var(--muted);
   font-weight: 950;
+}
+
+.duplicate-merge-section p {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.duplicate-merge-section select {
+  margin-bottom: 10px;
 }
 
 .form-grid {

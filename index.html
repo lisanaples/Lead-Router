@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=79" />
+    <link rel="stylesheet" href="styles.css?v=80" />
   </head>
   <body>
     <main class="app-shell">
@@ -520,13 +520,15 @@
           </div>
           <div class="delivery-history" id="deliveryHistory"></div>
         </section>
-        <div id="mergeLeadSection" class="hidden">
-          <label>Merge duplicate into this lead
-            <select id="mergeLeadTarget"><option value="">Select duplicate record...</option></select>
-          </label>
-          <button class="ghost-button" type="button" id="mergeLeadButton">Merge selected duplicate</button>
-          <p>The selected duplicate is archived; its notes and activity are retained.</p>
-        </div>
+        <section class="tracking-section duplicate-merge-section hidden" id="duplicateMergeSection">
+          <div class="section-title">
+            <h3>Duplicate lead</h3>
+            <span>Combine without losing history</span>
+          </div>
+          <p>Select the duplicate record. Its useful details and history will be added to this lead, and the duplicate will move to the archive.</p>
+          <select id="duplicateLeadSelect"></select>
+          <button class="ghost-button" type="button" id="mergeDuplicateLeadButton">Merge selected duplicate</button>
+        </section>
         <div class="dialog-actions">
           <button class="danger-button hidden" type="button" id="archiveLeadButton">Archive lead</button>
           <button class="ghost-button hidden" type="button" id="resendLeadButton">Send reminder</button>
@@ -576,7 +578,7 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v79.js?v=80"></script>
+    <script src="app-v80.js?v=80"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;

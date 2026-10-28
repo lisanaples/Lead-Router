@@ -29,6 +29,22 @@ module.exports = async function handler(request, response) {
     workspace.settings = workspace.settings || {};
 
     const lead = leadFromPayload(payload);
+    const recentDuplicate = workspace.leads.find((entry) => {
+      const age = Date.now() - Date.parse(entry.createdAt || 0);
+      if (!Number.isFinite(age) || age < 0 || age > 15 * 60 * 1000) return false;
+      const sameEmail = lead.email && String(entry.email || "").trim().toLowerCase() === String(lead.email).trim().toLowerCase();
+      const samePhone = lead.phone && String(entry.phone || "").replace(/\D/g, "") === String(lead.phone).replace(/\D/g, "");
+      const normalizedName = String(lead.name || "").trim().toLowerCase();
+      const sameName = normalizedName && !/^(new lead|new buyer|new seller|unknown)$/.test(normalizedName)
+        && String(entry.name || "").trim().toLowerCase() === normalizedName;
+      const sameProperty = String(entry.property || "").trim().toLowerCase() === String(lead.property || "").trim().toLowerCase();
+      const sameMessage = String(entry.message || "").trim() && String(entry.message || "").trim() === String(lead.message || "").trim();
+      return sameMessage || ((sameEmail || samePhone || sameName) && sameProperty);
+    });
+    if (recentDuplicate) {
+      response.status(200).json({ ok: true, leadId: recentDuplicate.id, lead: recentDuplicate, duplicateSubmission: true, repeatLead: Boolean(recentDuplicate.isRepeat), notifications: [] });
+      return;
+    }
     const previousLead = routeRepeatLead(workspace, lead);
     lead.activity.unshift({
       at: new Date().toISOString(),
