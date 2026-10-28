@@ -520,6 +520,13 @@
           </div>
           <div class="delivery-history" id="deliveryHistory"></div>
         </section>
+        <div id="mergeLeadSection" class="hidden">
+          <label>Merge duplicate into this lead
+            <select id="mergeLeadTarget"><option value="">Select duplicate record...</option></select>
+          </label>
+          <button class="ghost-button" type="button" id="mergeLeadButton">Merge selected duplicate</button>
+          <p>The selected duplicate is archived; its notes and activity are retained.</p>
+        </div>
         <div class="dialog-actions">
           <button class="danger-button hidden" type="button" id="archiveLeadButton">Archive lead</button>
           <button class="ghost-button hidden" type="button" id="resendLeadButton">Send reminder</button>
