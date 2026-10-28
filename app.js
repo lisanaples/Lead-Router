@@ -1534,16 +1534,17 @@ function saveLead(form, options = {}) {
 }
 
 function archiveLead(leadId) {
+  window.clearTimeout(leadFormAutoSaveTimer);
   const id = Number(leadId);
   const lead = leads.find((entry) => entry.id === id);
-  if (!lead) return;
+  if (!lead) { showToast("Lead not found. Refresh and try again."); return; }
   const confirmed = window.confirm(`Archive ${lead.name || "this lead"}? You can still find it later by filtering for Archived.`);
   if (!confirmed) return;
   lead.status = "archived";
   lead.lostAt = lead.lostAt || dateKey();
   addActivity(lead, "Lead archived.");
-  saveAndSync({ silent: false });
   document.querySelector("#leadDialog")?.close();
+  saveAndSync({ silent: false });
   renderAll();
   showToast("Lead archived.");
 }
@@ -1981,12 +1982,19 @@ function resetParsedLeadIntake(options = {}) {
   if (!options.silent) showToast("Lead preview cleared. Paste another lead when ready.");
 }
 
+let parsedLeadSubmissionInProgress = false;
 async function createParsedLeadAndNotify() {
+  if (parsedLeadSubmissionInProgress) return;
   if (!parsedLeadDraft) {
     showToast("Preview a lead first.");
     return;
   }
   applyParsedLeadPreviewEdits();
+  const button = document.querySelector("#createParsedLeadButton");
+  parsedLeadSubmissionInProgress = true;
+  button.disabled = true;
+  button.textContent = "Creating and notifying...";
+  button.setAttribute("aria-busy", "true");
   try {
     const result = await authenticatedAppApiRequest("/api/manual-lead", {
       method: "POST",
@@ -1998,6 +2006,11 @@ async function createParsedLeadAndNotify() {
     showToast(`Lead created. ${notificationDeliveryText(result.notifications || [])}`);
   } catch (error) {
     showToast(`Create failed: ${error.message}`);
+  } finally {
+    parsedLeadSubmissionInProgress = false;
+    button.disabled = false;
+    button.textContent = "Create and notify";
+    button.removeAttribute("aria-busy");
   }
 }
 
@@ -2483,7 +2496,9 @@ document.addEventListener("click", (event) => {
     const dialog = closeDialogButton.closest("dialog");
     if (dialog?.id === "leadDialog") {
       window.clearTimeout(leadFormAutoSaveTimer);
+      dialog.close();
       saveLead(document.querySelector("#leadForm"), { activity: false, silent: true });
+      return;
     }
     if (dialog?.id === "teamDialog") {
       window.clearTimeout(teamFormAutoSaveTimer);
