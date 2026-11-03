@@ -436,6 +436,88 @@ async function sendTestPush(owner, workspace) {
   return sendPush(member, lead, workspace);
 }
 
+async function sendClaimConfirmationEmail(member, lead) {
+  const apiKey = optionalEnv("RESEND_API_KEY");
+  const from = optionalEnv("EMAIL_FROM");
+  if (!apiKey || !from || !member.email) return { sent: false, skipped: "Email is not configured." };
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: member.email,
+      subject: `Claim confirmed: ${lead.name}`,
+      text: [
+        `Hi ${member.name},`,
+        "",
+        `This confirms that you claimed ${lead.name} in Lead Relay. This lead is now assigned to you.`,
+        lead.property ? `Property/area: ${lead.property}` : "",
+        lead.phone ? `Phone: ${lead.phone}` : "",
+        lead.email ? `Email: ${lead.email}` : "",
+        "",
+        `Open Lead Relay: ${appUrl()}`,
+      ].filter(Boolean).join("\n"),
+      html: `
+        <h2>Lead claim confirmed</h2>
+        <p>Hi ${member.name},</p>
+        <p>This confirms that you claimed <strong>${lead.name}</strong> in Lead Relay. This lead is now assigned to you.</p>
+        ${lead.property ? `<p>Property/area: ${lead.property}</p>` : ""}
+        ${lead.phone ? `<p>Phone: ${lead.phone}</p>` : ""}
+        ${lead.email ? `<p>Email: ${lead.email}</p>` : ""}
+        <p><a href="${appUrl()}">Open Lead Relay</a></p>
+      `,
+    }),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(text || "Claim confirmation email failed");
+  return { sent: true };
+}
+
+async function sendClaimConfirmationPush(member, lead, workspace) {
+  const publicKey = optionalEnv("VAPID_PUBLIC_KEY");
+  const privateKey = optionalEnv("VAPID_PRIVATE_KEY");
+  const subject = optionalEnv("VAPID_SUBJECT") || "mailto:lead-router@example.com";
+  const subscriptions = workspace.pushSubscriptions?.[member.name] || [];
+  if (!publicKey || !privateKey || !subscriptions.length) return { sent: false, skipped: "Push is not configured for this member." };
+  const webPush = require("web-push");
+  webPush.setVapidDetails(subject, publicKey, privateKey);
+  let sent = 0;
+  for (const subscription of subscriptions) {
+    await webPush.sendNotification(subscription, JSON.stringify({
+      title: "Lead claim confirmed",
+      body: `You claimed ${lead.name}.${lead.property ? ` ${lead.property}` : ""}`,
+      url: appUrl(),
+    }));
+    sent += 1;
+  }
+  return { sent: sent > 0, count: sent };
+}
+
+async function notifyClaimingMember(workspace, lead, owner) {
+  const member = (workspace.team || []).find((entry) => entry.name === owner);
+  if (!member) return { member: owner, email: false, push: false, error: "Team member not found." };
+  const result = { member: member.name, email: false, push: false };
+  try {
+    const emailResult = await sendClaimConfirmationEmail(member, lead);
+    result.email = Boolean(emailResult.sent);
+    if (emailResult.skipped) result.emailSkipped = emailResult.skipped;
+  } catch (error) {
+    result.emailError = error.message;
+  }
+  try {
+    const pushResult = await sendClaimConfirmationPush(member, lead, workspace);
+    result.push = Boolean(pushResult.sent);
+    if (pushResult.count) result.pushCount = pushResult.count;
+    if (pushResult.skipped) result.pushSkipped = pushResult.skipped;
+  } catch (error) {
+    result.pushError = error.message;
+  }
+  return result;
+}
+
 async function notifyActiveTeam(workspace, lead, options = {}) {
   const noticeLabel = String(options.noticeLabel || "").trim();
   const results = [];
@@ -510,6 +592,7 @@ module.exports = {
   parseLeadEmail,
   routeRepeatLead,
   notifyActiveTeam,
+  notifyClaimingMember,
   recordNotificationDelivery,
   optionalEnv,
   parseBody,

@@ -2,7 +2,9 @@ const {
   claimLead,
   getWorkspace,
   handleOptions,
+  notifyClaimingMember,
   parseBody,
+  recordNotificationDelivery,
   readBody,
   saveWorkspace,
 } = require("./_lead-router-lib");
@@ -29,7 +31,18 @@ module.exports = async function handler(request, response) {
     }
 
     await saveWorkspace(workspace);
-    response.status(200).json({ ok: true, lead: result.lead });
+    const confirmation = await notifyClaimingMember(workspace, result.lead, owner);
+    recordNotificationDelivery(result.lead, [confirmation], "Claim confirmation sent");
+    result.lead.activity.unshift({
+      at: new Date().toISOString(),
+      text: `Claim confirmation sent to ${owner}: ${confirmation.email ? "email delivered" : "email not delivered"}; ${confirmation.push ? "push delivered" : "push not delivered"}.`,
+    });
+    try {
+      await saveWorkspace(workspace);
+    } catch (historyError) {
+      confirmation.historyError = historyError.message;
+    }
+    response.status(200).json({ ok: true, lead: result.lead, confirmation });
   } catch (error) {
     response.status(500).json({ ok: false, error: error.message });
   }

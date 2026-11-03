@@ -1,8 +1,8 @@
-const CACHE_NAME = "lead-router-v84";
-const OFFLINE_PAGE = "offline-index-v84";
+const CACHE_NAME = "lead-router-v85";
+const OFFLINE_PAGE = "offline-index-v85";
 const APP_SHELL = [
-  "styles.css?v=84",
-  "app-v84.js?v=84",
+  "styles.css?v=85",
+  "app-v85.js?v=85",
   "assets/lead-router-icon.svg",
   "assets/lead-relay-background.png",
   "manifest.webmanifest"
