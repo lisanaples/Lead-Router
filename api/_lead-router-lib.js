@@ -230,7 +230,7 @@ function leadFromPayload(payload) {
     source,
     type,
     name,
-    phone: payload.phone || payload.mobile || parsed.phone || "",
+    phone: normalizedPhone(payload.phone || payload.mobile || parsed.phone || ""),
     email: payload.email || parsed.email || "",
     property: payload.property || payload.address || payload.listing || parsed.property || "",
     price: payload.price || payload.price_range || parsed.price || "",
@@ -245,6 +245,8 @@ function leadFromPayload(payload) {
     convertedAt: "",
     lostAt: "",
     outcomeNotes: "",
+    forewarnStatus: "notChecked",
+    forewarnNotes: "",
     message: payload.notes || payload.comments || rawText || parsed.message || "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -359,14 +361,52 @@ function claimUrl(lead, member) {
   return url.toString();
 }
 
+function viewLeadUrl(lead) {
+  const url = new URL(appUrl());
+  url.searchParams.set("lead", lead.id);
+  return url.toString();
+}
+
+function emailEscape(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function receivedLabel(value) {
+  const date = new Date(value || "");
+  if (!Number.isFinite(date.getTime())) return String(value || "");
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
+  }).format(date);
+}
+
 function notificationText(lead, member, noticeLabel = "") {
+  const view = viewLeadUrl(lead);
   return [
     noticeLabel ? `${noticeLabel}: this lead is still unclaimed.` : "",
     `${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.source} ${lead.type} inquiry from ${lead.name}`,
     lead.isRepeat ? `This person previously inquired and is already assigned to you.` : "",
+    lead.createdAt ? `Received: ${receivedLabel(lead.createdAt)}` : "",
+    lead.source ? `Lead source: ${lead.source}` : "",
+    lead.type ? `Lead type: ${lead.type}` : "",
+    lead.urgency ? `Priority: ${lead.urgency}` : "",
     lead.property ? `Property/area: ${lead.property}` : "",
+    lead.price ? `Price/range: ${lead.price}` : "",
     lead.phone ? `Phone: ${lead.phone}` : "",
-    lead.isRepeat ? `Open Lead Relay: ${appUrl()}` : `Claim: ${claimUrl(lead, member)}`,
+    lead.email ? `Email: ${lead.email}` : "",
+    lead.message ? `Original inquiry / notes:\n${lead.message}` : "",
+    lead.isRepeat ? "" : `Claim this lead: ${claimUrl(lead, member)}`,
+    `View lead details: ${view}`,
   ].filter(Boolean).join("\n");
 }
 
@@ -375,6 +415,18 @@ async function sendEmail(member, lead, noticeLabel = "") {
   const from = optionalEnv("EMAIL_FROM");
   if (!apiKey || !from || !member.email) return { sent: false, skipped: "Email is not configured." };
   const claim = claimUrl(lead, member);
+  const view = viewLeadUrl(lead);
+  const detailRows = [
+    ["Name", lead.name],
+    ["Received", receivedLabel(lead.createdAt)],
+    ["Lead source", lead.source],
+    ["Lead type", lead.type],
+    ["Priority", lead.urgency],
+    ["Property / area", lead.property],
+    ["Price / range", lead.price],
+    ["Phone", lead.phone],
+    ["Email", lead.email],
+  ].filter(([, value]) => String(value || "").trim());
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -387,14 +439,27 @@ async function sendEmail(member, lead, noticeLabel = "") {
       subject: `${noticeLabel ? `${noticeLabel}: ` : ""}${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.name} (${lead.source})`,
       text: notificationText(lead, member, noticeLabel),
       html: `
-        ${noticeLabel ? `<h2>${noticeLabel}: This lead is still unclaimed</h2>` : ""}
-        <h2>${lead.isRepeat ? "Repeat lead" : "New lead"}: ${lead.source} ${lead.type} inquiry</h2>
-        ${lead.isRepeat ? `<p><strong>This person previously inquired and is already assigned to you.</strong></p>` : ""}
-        <p><strong>${lead.name}</strong></p>
-        ${lead.property ? `<p>Property/area: ${lead.property}</p>` : ""}
-        ${lead.phone ? `<p>Phone: ${lead.phone}</p>` : ""}
-        ${lead.email ? `<p>Email: ${lead.email}</p>` : ""}
-        <p><a href="${lead.isRepeat ? appUrl() : claim}">${lead.isRepeat ? "Open Lead Relay" : "Claim this lead"}</a></p>
+        <div style="margin:0;background:#f1f5f4;padding:24px;font-family:Arial,sans-serif;color:#18213d;">
+          <div style="max-width:680px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #d8e2e3;">
+            <div style="background:#123849;color:#ffffff;padding:22px 26px;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#f2c65d;">Lead Relay</div>
+              <h1 style="margin:7px 0 0;font-size:25px;">${emailEscape(noticeLabel ? `${noticeLabel}: Lead still unclaimed` : `${lead.isRepeat ? "Repeat" : "New"} lead received`)}</h1>
+            </div>
+            <div style="padding:24px 26px;">
+              ${lead.isRepeat ? `<p style="padding:11px 13px;background:#fff4c7;border-radius:8px;"><strong>This person previously inquired and is already assigned to you.</strong></p>` : ""}
+              <h2 style="margin:0 0 18px;font-size:23px;color:#123849;">${emailEscape(lead.name)}</h2>
+              <table role="presentation" style="width:100%;border-collapse:collapse;font-size:15px;">
+                ${detailRows.map(([label, value]) => `<tr><td style="width:135px;padding:8px 10px 8px 0;border-bottom:1px solid #edf1f2;color:#66708d;font-weight:700;vertical-align:top;">${emailEscape(label)}</td><td style="padding:8px 0;border-bottom:1px solid #edf1f2;font-weight:600;vertical-align:top;">${emailEscape(value)}</td></tr>`).join("")}
+              </table>
+              ${lead.message ? `<div style="margin-top:20px;padding:16px;background:#fff8cb;border:1px solid #ead36e;border-radius:9px;"><strong style="display:block;margin-bottom:7px;color:#72590d;">Original inquiry / notes</strong><div style="white-space:pre-wrap;line-height:1.5;overflow-wrap:anywhere;">${emailEscape(lead.message)}</div></div>` : ""}
+              <div style="margin-top:24px;">
+                ${lead.isRepeat ? "" : `<a href="${emailEscape(claim)}" style="display:inline-block;margin:0 10px 10px 0;padding:13px 19px;border-radius:8px;background:#123849;color:#ffffff;text-decoration:none;font-weight:700;">Claim this lead</a>`}
+                <a href="${emailEscape(view)}" style="display:inline-block;margin:0 0 10px;padding:12px 18px;border:2px solid #123849;border-radius:8px;background:#ffffff;color:#123849;text-decoration:none;font-weight:700;">View lead details</a>
+              </div>
+              <p style="margin:12px 0 0;color:#66708d;font-size:12px;line-height:1.45;">Claiming assigns the lead to you immediately. Viewing the lead does not claim it.</p>
+            </div>
+          </div>
+        </div>
       `,
     }),
   });
@@ -412,15 +477,34 @@ async function sendPush(member, lead, workspace, noticeLabel = "") {
   const webPush = require("web-push");
   webPush.setVapidDetails(subject, publicKey, privateKey);
   let sent = 0;
+  let expired = 0;
+  const activeSubscriptions = [];
+  const errors = [];
   for (const subscription of subscriptions) {
-    await webPush.sendNotification(subscription, JSON.stringify({
-      title: `${noticeLabel ? `${noticeLabel}: ` : ""}${lead.isRepeat ? "Repeat" : "New"} ${lead.source} lead`,
-      body: `${lead.name}${noticeLabel ? " - still unclaimed" : ""}${lead.isRepeat ? " - previously assigned to you" : ""}${lead.property ? ` - ${lead.property}` : ""}`,
-      url: lead.isRepeat ? appUrl() : claimUrl(lead, member),
-    }));
-    sent += 1;
+    try {
+      await webPush.sendNotification(subscription, JSON.stringify({
+        title: `${noticeLabel ? `${noticeLabel}: ` : ""}${lead.isRepeat ? "Repeat" : "New"} ${lead.source} lead`,
+        body: `${lead.name}${noticeLabel ? " - still unclaimed" : ""}${lead.isRepeat ? " - previously assigned to you" : ""}${lead.property ? ` - ${lead.property}` : ""}`,
+        url: lead.isRepeat ? appUrl() : claimUrl(lead, member),
+      }));
+      activeSubscriptions.push(subscription);
+      sent += 1;
+    } catch (error) {
+      if ([404, 410].includes(Number(error.statusCode))) expired += 1;
+      else {
+        activeSubscriptions.push(subscription);
+        errors.push(error);
+      }
+    }
   }
-  return { sent: sent > 0, count: sent };
+  workspace.pushSubscriptions[member.name] = activeSubscriptions;
+  if (!sent && errors.length) throw errors[0];
+  return {
+    sent: sent > 0,
+    count: sent,
+    expired,
+    skipped: !sent && expired ? "This device registration expired. Open Lead Relay Settings to reconnect push alerts." : "",
+  };
 }
 
 async function sendTestPush(owner, workspace) {
@@ -485,15 +569,34 @@ async function sendClaimConfirmationPush(member, lead, workspace) {
   const webPush = require("web-push");
   webPush.setVapidDetails(subject, publicKey, privateKey);
   let sent = 0;
+  let expired = 0;
+  const activeSubscriptions = [];
+  const errors = [];
   for (const subscription of subscriptions) {
-    await webPush.sendNotification(subscription, JSON.stringify({
-      title: "Lead claim confirmed",
-      body: `You claimed ${lead.name}.${lead.property ? ` ${lead.property}` : ""}`,
-      url: appUrl(),
-    }));
-    sent += 1;
+    try {
+      await webPush.sendNotification(subscription, JSON.stringify({
+        title: "Lead claim confirmed",
+        body: `You claimed ${lead.name}.${lead.property ? ` ${lead.property}` : ""}`,
+        url: appUrl(),
+      }));
+      activeSubscriptions.push(subscription);
+      sent += 1;
+    } catch (error) {
+      if ([404, 410].includes(Number(error.statusCode))) expired += 1;
+      else {
+        activeSubscriptions.push(subscription);
+        errors.push(error);
+      }
+    }
   }
-  return { sent: sent > 0, count: sent };
+  workspace.pushSubscriptions[member.name] = activeSubscriptions;
+  if (!sent && errors.length) throw errors[0];
+  return {
+    sent: sent > 0,
+    count: sent,
+    expired,
+    skipped: !sent && expired ? "This device registration expired. Open Lead Relay Settings to reconnect push alerts." : "",
+  };
 }
 
 async function notifyClaimingMember(workspace, lead, owner) {

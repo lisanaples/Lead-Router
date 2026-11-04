@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=85" />
+    <link rel="stylesheet" href="styles.css?v=92" />
   </head>
   <body>
     <main class="app-shell">
@@ -55,6 +55,7 @@
             <strong id="syncStatus">Local mode</strong>
             <p id="syncHelper">Sign in to share leads and claims with the team.</p>
           </div>
+          <button class="ghost-button mobile-account-toggle hidden" type="button" id="toggleAccountPanel" aria-expanded="false">Account ▾</button>
           <label class="work-as-control">Working as
             <select id="myOwnerSelect"></select>
           </label>
@@ -345,14 +346,15 @@
             <div class="settings-card">
               <strong>Device alerts</strong>
               <p>Use these once on each phone or computer that should receive push notifications.</p>
+              <p class="push-status" id="pushStatus">Checking this device...</p>
               <div class="setup-actions">
-                <button class="ghost-button small-button" type="button" id="enablePushButton">Enable push alerts</button>
+                <button class="ghost-button small-button" type="button" id="enablePushButton">Connect or repair push alerts</button>
                 <button class="ghost-button small-button" type="button" id="testPushButton">Send test push</button>
               </div>
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 75</strong></p>
+              <p><strong>Lead Relay version 92</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -439,7 +441,10 @@
               <strong id="contactAttemptCount">0 contact attempts</strong>
               <span id="lastContactAttempt">No contact attempt logged yet</span>
             </div>
-            <button class="primary-button" type="button" id="logContactAttemptButton">+ Add contact attempt</button>
+            <div class="contact-attempt-controls">
+              <button class="primary-button" type="button" id="logContactAttemptButton">+ Add contact attempt</button>
+              <button class="ghost-button" type="button" id="undoContactAttemptButton">Undo last attempt</button>
+            </div>
           </div>
           <div class="form-grid">
             <label>First contact attempted <input name="firstAttemptedAt" type="date" /></label>
@@ -451,6 +456,24 @@
             <label>Lost date <input name="lostAt" type="date" /></label>
           </div>
           <label>Lost reason / conversion notes <input name="outcomeNotes" placeholder="Not ready, bought with another agent, converted, etc." /></label>
+        </section>
+        <section class="tracking-section forewarn-section">
+          <div class="section-title">
+            <h3>Forewarn screening</h3>
+            <span>Safety check</span>
+          </div>
+          <div class="form-grid forewarn-fields">
+            <label>Forewarn result
+              <select name="forewarnStatus">
+                <option value="notChecked">Not checked</option>
+                <option value="pass">Pass</option>
+                <option value="fail">Fail</option>
+              </select>
+            </label>
+            <label>Forewarn notes
+              <textarea name="forewarnNotes" placeholder="Add any details or concerns from the Forewarn search..."></textarea>
+            </label>
+          </div>
         </section>
         <label>Message <textarea name="message" placeholder="Original message or notes..."></textarea></label>
         <section class="tracking-section notes-section">
@@ -578,14 +601,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v85.js?v=85"></script>
+    <script src="app-v92.js?v=92"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=85", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=92", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;

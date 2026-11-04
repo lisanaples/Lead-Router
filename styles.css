@@ -249,6 +249,10 @@ button {
   min-width: 150px;
 }
 
+.mobile-account-toggle {
+  display: none;
+}
+
 .hidden {
   display: none !important;
 }
@@ -1242,6 +1246,55 @@ p {
   background: rgba(255, 255, 235, 0.9);
 }
 
+.push-status {
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: rgba(217, 164, 65, 0.15);
+  color: var(--teal-dark);
+  font-weight: 850;
+}
+
+.push-status[data-state="connected"] {
+  background: rgba(31, 157, 102, 0.14);
+  color: #17643f;
+}
+
+.push-status[data-state="error"] {
+  background: rgba(190, 55, 55, 0.12);
+  color: #8e2525;
+}
+
+.forewarn-section {
+  border-color: rgba(18, 56, 73, 0.24);
+  background: linear-gradient(145deg, rgba(238, 247, 248, 0.96), rgba(255, 255, 255, 0.96));
+}
+
+.forewarn-fields {
+  grid-template-columns: minmax(180px, 0.35fr) minmax(280px, 1fr);
+}
+
+.forewarn-fields textarea {
+  min-height: 92px;
+}
+
+.forewarn-badge {
+  border-radius: 999px;
+  padding: 4px 8px;
+  color: #fff !important;
+  font-size: 0.66rem !important;
+  font-weight: 950 !important;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.forewarn-pass {
+  background: #247246;
+}
+
+.forewarn-fail {
+  background: #a52d35;
+}
+
 .lead-sticky-note {
   position: relative;
   margin: 7px 2px 2px;
@@ -1620,6 +1673,12 @@ p {
   border: 1px solid var(--line);
 }
 
+.contact-attempt-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .contact-attempt-summary > div {
   display: grid;
   gap: 4px;
@@ -1968,6 +2027,32 @@ label {
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
+  }
+
+  .mobile-account-toggle {
+    display: block;
+    min-height: 38px;
+    padding: 7px 11px;
+    white-space: nowrap;
+  }
+
+  .sync-panel.mobile-account-collapsed {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    padding: 8px 10px;
+  }
+
+  .sync-panel.mobile-account-collapsed > div:first-child .eyebrow,
+  .sync-panel.mobile-account-collapsed > div:first-child p,
+  .sync-panel.mobile-account-collapsed > .work-as-control,
+  .sync-panel.mobile-account-collapsed > .auth-form,
+  .sync-panel.mobile-account-collapsed > .sync-actions {
+    display: none !important;
+  }
+
+  .sync-panel.mobile-account-collapsed > div:first-child strong {
+    margin: 0;
+    font-size: 0.86rem;
   }
 
   .nav-list {
