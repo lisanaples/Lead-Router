@@ -46,22 +46,23 @@ module.exports = async function handler(request, response) {
       return;
     }
     const previousLead = routeRepeatLead(workspace, lead);
-    lead.activity.unshift({
+    const savedLead = previousLead || lead;
+    savedLead.activity.unshift({
       at: new Date().toISOString(),
-      text: "Lead created from pasted email inside Lead Relay.",
+      text: previousLead ? "Repeat inquiry added to this existing lead from pasted email inside Lead Relay." : "Lead created from pasted email inside Lead Relay.",
     });
-    workspace.leads.unshift(lead);
-    const notifications = await notifyActiveTeam(workspace, lead);
-    recordNotificationDelivery(lead, notifications, "Initial lead notification");
-    lead.activity.unshift({
+    if (!previousLead) workspace.leads.unshift(lead);
+    const notifications = await notifyActiveTeam(workspace, savedLead);
+    recordNotificationDelivery(savedLead, notifications, "Initial lead notification");
+    savedLead.activity.unshift({
       at: new Date().toISOString(),
       text: previousLead
-        ? `Repeat-lead notification attempted only for ${lead.assignedTo}.`
+        ? `Repeat-inquiry notification attempted only for ${savedLead.assignedTo}. No duplicate lead was created.`
         : `Email/push notification attempted for ${notifications.length} team member(s).`,
     });
 
     await saveWorkspace(workspace);
-    response.status(200).json({ ok: true, leadId: lead.id, lead, repeatLead: Boolean(previousLead), notifications });
+    response.status(200).json({ ok: true, leadId: savedLead.id, lead: savedLead, repeatLead: Boolean(previousLead), existingLeadUpdated: Boolean(previousLead), notifications });
   } catch (error) {
     response.status(500).json({ ok: false, error: error.message });
   }

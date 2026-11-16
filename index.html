@@ -601,14 +601,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v92.js?v=92"></script>
+    <script src="app-v93.js?v=93"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=92", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=93", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;

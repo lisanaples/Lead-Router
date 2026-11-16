@@ -49,18 +49,19 @@ module.exports = async function handler(request, response) {
 
     const lead = leadFromPayload(payload);
     const previousLead = routeRepeatLead(workspace, lead);
-    workspace.leads.unshift(lead);
-    const notifications = await notifyActiveTeam(workspace, lead);
-    recordNotificationDelivery(lead, notifications, "Automatic lead notification");
-    lead.activity.unshift({
+    const savedLead = previousLead || lead;
+    if (!previousLead) workspace.leads.unshift(lead);
+    const notifications = await notifyActiveTeam(workspace, savedLead);
+    recordNotificationDelivery(savedLead, notifications, "Automatic lead notification");
+    savedLead.activity.unshift({
       at: new Date().toISOString(),
       text: previousLead
-        ? `Repeat-lead notification attempted only for ${lead.assignedTo}.`
+        ? `Repeat-inquiry notification attempted only for ${savedLead.assignedTo}. No duplicate lead was created.`
         : `Email/push notification attempted for ${notifications.length} team member(s).`,
     });
 
     await saveWorkspace(workspace);
-    response.status(200).json({ ok: true, leadId: lead.id, repeatLead: Boolean(previousLead), assignedTo: lead.assignedTo, notifications });
+    response.status(200).json({ ok: true, leadId: savedLead.id, repeatLead: Boolean(previousLead), existingLeadUpdated: Boolean(previousLead), assignedTo: savedLead.assignedTo, notifications });
   } catch (error) {
     response.status(500).json({ ok: false, error: error.message });
   }

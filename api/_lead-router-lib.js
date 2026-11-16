@@ -277,14 +277,39 @@ function findPreviousOwnedLead(workspace, lead) {
 function routeRepeatLead(workspace, lead) {
   const previous = findPreviousOwnedLead(workspace, lead);
   if (!previous) return null;
-  lead.assignedTo = previous.assignedTo;
-  lead.status = "claimed";
-  lead.claimedAt = lead.claimedAt || dateKey();
-  lead.isRepeat = true;
-  lead.repeatOfLeadId = previous.id;
-  lead.activity.unshift({
+  const now = new Date().toISOString();
+  previous.repeatInquiries = Array.isArray(previous.repeatInquiries) ? previous.repeatInquiries : [];
+  previous.repeatInquiries.unshift({
+    at: now,
+    source: lead.source,
+    type: lead.type,
+    property: lead.property,
+    price: lead.price,
+    urgency: lead.urgency,
+    phone: lead.phone,
+    email: lead.email,
+    message: lead.message,
+  });
+  previous.repeatInquiries = previous.repeatInquiries.slice(0, 50);
+  previous.repeatCount = Number(previous.repeatCount || 0) + 1;
+  previous.lastRepeatInquiryAt = now;
+  previous.isRepeat = true;
+  previous.statusBeforeRepeat = previous.status;
+  previous.status = "claimed";
+  previous.claimedAt = previous.claimedAt || dateKey();
+  previous.updatedAt = now;
+  if (lead.source) previous.source = lead.source;
+  if (lead.type) previous.type = lead.type;
+  if (lead.property) previous.property = lead.property;
+  if (lead.price) previous.price = lead.price;
+  if (lead.urgency) previous.urgency = lead.urgency;
+  if (lead.phone) previous.phone = lead.phone;
+  if (lead.email) previous.email = lead.email;
+  if (lead.message) previous.message = lead.message;
+  previous.activity = Array.isArray(previous.activity) ? previous.activity : [];
+  previous.activity.unshift({
     at: new Date().toISOString(),
-    text: `Repeat lead matched by email or phone and routed only to ${previous.assignedTo}.`,
+    text: `Repeat inquiry matched by email or phone. Existing lead reopened and notification routed only to ${previous.assignedTo}.`,
   });
   return previous;
 }

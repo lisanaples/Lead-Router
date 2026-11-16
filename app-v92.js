@@ -113,6 +113,7 @@ let sessionNeedsSignIn = false;
 let localStorageLeadSaveAvailable = true;
 let mobileAccountExpanded = false;
 const contactAttemptLocks = new Set();
+const pendingLeadClaims = new Set();
 
 team = team.map((member) => ({
   ...member,
@@ -908,11 +909,13 @@ function ownerFilterOptions(selected = "all") {
   ].join("");
 }
 
-function showToast(message) {
+function showToast(message, tone = "") {
   const toast = document.querySelector("#toast");
   toast.textContent = message;
+  toast.classList.toggle("success", tone === "success");
+  toast.classList.toggle("error", tone === "error");
   toast.classList.add("visible");
-  window.setTimeout(() => toast.classList.remove("visible"), 5200);
+  window.setTimeout(() => toast.classList.remove("visible", "success", "error"), tone === "success" ? 7000 : 5200);
 }
 
 function urlBase64ToUint8Array(value) {
@@ -1142,9 +1145,10 @@ function leadCard(lead, compact = false) {
 }
 
 function claimButtons(lead) {
+  const pending = pendingLeadClaims.has(String(lead.id));
   if (!canManageAll()) {
     const member = team.find((entry) => entry.name === myOwner);
-    return member ? `<button class="primary-button" type="button" data-claim-lead="${lead.id}" data-member="${member.id}">Claim lead</button>` : "";
+    return member ? `<button class="primary-button claim-button${pending ? " claiming" : ""}" type="button" data-claim-lead="${lead.id}" data-member="${member.id}" ${pending ? "disabled" : ""}>${pending ? "Claiming…" : "Claim lead"}</button>` : "";
   }
   const members = activeTeam();
   if (!members.length) return `<button class="ghost-button" type="button" disabled>No active agents</button>`;
@@ -1189,7 +1193,7 @@ function renderDashboard() {
   const claimed = scope.filter((lead) => !["new", "closed", "converted", "lost", "doNotContact", "archived"].includes(lead.status)).sort(sortHotToCold);
   const recentCutoff = Date.now() - (7 * 24 * 60 * 60 * 1000);
   const recent = scope
-    .filter((lead) => lead.status !== "archived" && Number.isFinite(new Date(lead.createdAt).getTime()) && new Date(lead.createdAt).getTime() >= recentCutoff)
+    .filter((lead) => !["archived", "doNotContact"].includes(lead.status) && Number.isFinite(new Date(lead.createdAt).getTime()) && new Date(lead.createdAt).getTime() >= recentCutoff)
     .sort(sortNewest);
   document.querySelector("#unclaimedCount").textContent = unclaimed.length;
   document.querySelector("#claimedCount").textContent = claimed.length;
@@ -1228,18 +1232,19 @@ function sortHotToCold(a, b) {
 function filteredLeads() {
   const term = searchTerm.trim().toLowerCase();
   return visibleLeads().filter((lead) => {
-    const finalStatuses = ["closed", "converted", "lost", "doNotContact"];
+    const finalStatuses = ["closed", "converted", "lost"];
+    const archiveStatuses = ["archived", "doNotContact"];
     const isDue = lead.nextFollowUpDate && lead.nextFollowUpDate <= dateKey();
     const isOldUnclaimed = isOldUnclaimedLead(lead);
     const matchesView = inboxView === "attention"
-      ? isNewUnclaimedLead(lead) || (isDue && lead.status !== "new" && !finalStatuses.includes(lead.status) && lead.status !== "archived")
+      ? isNewUnclaimedLead(lead) || (isDue && lead.status !== "new" && !finalStatuses.includes(lead.status) && !archiveStatuses.includes(lead.status))
       : inboxView === "oldUnclaimed"
       ? isOldUnclaimed
       : inboxView === "closed"
       ? finalStatuses.includes(lead.status)
       : inboxView === "archive"
-      ? lead.status === "archived"
-      : !finalStatuses.includes(lead.status) && lead.status !== "archived" && !isOldUnclaimed;
+      ? archiveStatuses.includes(lead.status)
+      : !finalStatuses.includes(lead.status) && !archiveStatuses.includes(lead.status) && !isOldUnclaimed;
     const matchesStatus = statusFilter === "all" || lead.status === statusFilter;
     const matchesOwner = ownerFilter === "all" || String(lead.assignedTo || "") === ownerFilter;
     const haystack = [lead.name, lead.source, lead.type, lead.phone, lead.email, lead.property, lead.price, lead.message, lead.assignedTo, lead.previousOwner]
@@ -1250,14 +1255,18 @@ function filteredLeads() {
 }
 
 function inboxLeadRow(lead) {
+  const quickClaim = lead.status === "new" && !canManageAll() ? claimButtons(lead) : "";
   return `
-    <button class="inbox-lead-row" type="button" data-edit-lead="${lead.id}">
-      <span class="inbox-lead-name"><span class="lead-name-with-counter"><strong>${escapeHtml(lead.name)}</strong>${contactAttemptBadge(lead)}</span><small>${escapeHtml(lastContactAttemptLabel(lead))}</small></span>
-      <span><span class="status-pill">${statusLabel(lead.status)}</span></span>
-      <span>${escapeHtml(lead.assignedTo || "Unassigned")}</span>
-      <span>${lead.createdAt ? dateOnlyLabel(String(lead.createdAt).slice(0, 10)) : "No date"}</span>
-      <span class="inbox-property"><strong>${escapeHtml(lead.property || "No property")}</strong><small>${escapeHtml(lead.source || "Lead")} · ${escapeHtml(lead.urgency || "Warm")}</small></span>
-    </button>
+    <article class="inbox-lead-row${quickClaim ? " has-quick-claim" : ""}">
+      <button class="inbox-lead-open" type="button" data-edit-lead="${lead.id}">
+        <span class="inbox-lead-name"><span class="lead-name-with-counter"><strong>${escapeHtml(lead.name)}</strong>${contactAttemptBadge(lead)}</span><small>${escapeHtml(lastContactAttemptLabel(lead))}</small></span>
+        <span><span class="status-pill">${statusLabel(lead.status)}</span></span>
+        <span>${escapeHtml(lead.assignedTo || "Unassigned")}</span>
+        <span>${lead.createdAt ? dateOnlyLabel(String(lead.createdAt).slice(0, 10)) : "No date"}</span>
+        <span class="inbox-property"><strong>${escapeHtml(lead.property || "No property")}</strong><small>${escapeHtml(lead.source || "Lead")} · ${escapeHtml(lead.urgency || "Warm")}</small></span>
+      </button>
+      ${quickClaim ? `<div class="inbox-quick-claim">${quickClaim}</div>` : ""}
+    </article>
   `;
 }
 
@@ -2151,6 +2160,15 @@ async function claimLead(leadId, memberId) {
     showToast("This lead has already been claimed.");
     return;
   }
+  const claimKey = String(lead.id);
+  if (pendingLeadClaims.has(claimKey)) return;
+  pendingLeadClaims.add(claimKey);
+  const previousStatus = lead.status;
+  const previousOwner = lead.assignedTo;
+  lead.status = "claimed";
+  lead.assignedTo = member.name;
+  renderAll();
+  showToast(`Claiming ${lead.name} for ${member.name}…`);
   try {
     const result = await appApiRequest("/api/claim-lead", {
       method: "POST",
@@ -2159,9 +2177,16 @@ async function claimLead(leadId, memberId) {
     const refreshed = await refreshFromCloud({ silent: true });
     if (!refreshed && result.lead) Object.assign(lead, result.lead);
     renderAll();
-    showToast(`${member.name} claimed ${lead.name}.${claimConfirmationSummary(result.confirmation)}`);
+    showToast(`Claim successful — ${lead.name} is now assigned to ${member.name}.${claimConfirmationSummary(result.confirmation)}`, "success");
   } catch (error) {
-    showToast(`Claim failed: ${error.message}`);
+    lead.status = previousStatus;
+    lead.assignedTo = previousOwner;
+    await refreshFromCloud({ silent: true }).catch(() => false);
+    renderAll();
+    showToast(error.message.includes("already been claimed") ? error.message : `Claim failed: ${error.message}`, "error");
+  } finally {
+    pendingLeadClaims.delete(claimKey);
+    renderAll();
   }
 }
 
