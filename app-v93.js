@@ -114,6 +114,8 @@ let localStorageLeadSaveAvailable = true;
 let mobileAccountExpanded = false;
 const contactAttemptLocks = new Set();
 const pendingLeadClaims = new Set();
+const selectedLeadIds = new Set();
+let claimRequestQueue = Promise.resolve();
 
 team = team.map((member) => ({
   ...member,
@@ -1256,8 +1258,10 @@ function filteredLeads() {
 
 function inboxLeadRow(lead) {
   const quickClaim = lead.status === "new" && !canManageAll() ? claimButtons(lead) : "";
+  const selectable = lead.status === "new";
   return `
     <article class="inbox-lead-row${quickClaim ? " has-quick-claim" : ""}">
+      ${selectable ? `<label class="lead-select-box" title="Select ${escapeAttr(lead.name)}"><input type="checkbox" data-select-lead="${lead.id}" ${selectedLeadIds.has(String(lead.id)) ? "checked" : ""} /><span class="sr-only">Select ${escapeHtml(lead.name)}</span></label>` : ""}
       <button class="inbox-lead-open" type="button" data-edit-lead="${lead.id}">
         <span class="inbox-lead-name"><span class="lead-name-with-counter"><strong>${escapeHtml(lead.name)}</strong>${contactAttemptBadge(lead)}</span><small>${escapeHtml(lastContactAttemptLabel(lead))}</small></span>
         <span><span class="status-pill">${statusLabel(lead.status)}</span></span>
@@ -1286,6 +1290,16 @@ function renderInbox() {
     </div>
   ` : "";
   document.querySelectorAll("[data-inbox-view]").forEach((button) => button.classList.toggle("active", button.dataset.inboxView === inboxView));
+  const visibleUnclaimedIds = pageRows.filter((lead) => lead.status === "new").map((lead) => String(lead.id));
+  const selectedVisible = visibleUnclaimedIds.filter((id) => selectedLeadIds.has(id)).length;
+  const bar = document.querySelector("#bulkClaimBar");
+  bar.classList.toggle("hidden", !visibleUnclaimedIds.length || ["closed", "archive"].includes(inboxView));
+  document.querySelector("#selectedLeadCount").textContent = `${selectedLeadIds.size} selected`;
+  document.querySelector("#claimSelectedLeadsButton").disabled = selectedLeadIds.size === 0;
+  const selectAll = document.querySelector("#selectVisibleUnclaimed");
+  selectAll.checked = Boolean(visibleUnclaimedIds.length) && selectedVisible === visibleUnclaimedIds.length;
+  selectAll.indeterminate = selectedVisible > 0 && selectedVisible < visibleUnclaimedIds.length;
+  selectAll.dataset.visibleLeadIds = visibleUnclaimedIds.join(",");
 }
 
 function renderTeam() {
@@ -2169,13 +2183,14 @@ async function claimLead(leadId, memberId) {
   lead.assignedTo = member.name;
   renderAll();
   showToast(`Claiming ${lead.name} for ${member.name}…`);
+  const performClaim = async () => {
   try {
     const result = await appApiRequest("/api/claim-lead", {
       method: "POST",
       body: JSON.stringify({ leadId: lead.id, owner: member.name }),
     });
-    const refreshed = await refreshFromCloud({ silent: true });
-    if (!refreshed && result.lead) Object.assign(lead, result.lead);
+    if (result.lead) Object.assign(lead, result.lead);
+    saveAll();
     renderAll();
     showToast(`Claim successful — ${lead.name} is now assigned to ${member.name}.${claimConfirmationSummary(result.confirmation)}`, "success");
   } catch (error) {
@@ -2186,6 +2201,64 @@ async function claimLead(leadId, memberId) {
     showToast(error.message.includes("already been claimed") ? error.message : `Claim failed: ${error.message}`, "error");
   } finally {
     pendingLeadClaims.delete(claimKey);
+    renderAll();
+  }
+  };
+  claimRequestQueue = claimRequestQueue.then(performClaim, performClaim);
+  return claimRequestQueue;
+}
+
+async function claimSelectedLeads() {
+  const member = team.find((entry) => entry.name === myOwner);
+  const ids = [...selectedLeadIds];
+  if (!member || !ids.length) {
+    showToast("Choose your team-member name and at least one unclaimed lead.", "error");
+    return;
+  }
+  const eligible = ids.map((id) => leads.find((lead) => String(lead.id) === id)).filter((lead) => lead?.status === "new");
+  if (!eligible.length) {
+    selectedLeadIds.clear();
+    renderInbox();
+    showToast("Those leads are no longer unclaimed. Refresh and try again.", "error");
+    return;
+  }
+  const snapshots = new Map(eligible.map((lead) => [String(lead.id), { status: lead.status, assignedTo: lead.assignedTo }]));
+  eligible.forEach((lead) => {
+    pendingLeadClaims.add(String(lead.id));
+    lead.status = "claimed";
+    lead.assignedTo = member.name;
+  });
+  renderAll();
+  showToast(`Claiming ${eligible.length} leads for ${member.name}…`);
+  const button = document.querySelector("#claimSelectedLeadsButton");
+  button.disabled = true;
+  button.textContent = "Claiming selected…";
+  try {
+    const result = await appApiRequest("/api/claim-leads", {
+      method: "POST",
+      body: JSON.stringify({ leadIds: eligible.map((lead) => lead.id), owner: member.name }),
+    });
+    (result.claimed || []).forEach((savedLead) => {
+      const localLead = leads.find((lead) => String(lead.id) === String(savedLead.id));
+      if (localLead) Object.assign(localLead, savedLead);
+      selectedLeadIds.delete(String(savedLead.id));
+    });
+    (result.failed || []).forEach((failure) => {
+      const localLead = leads.find((lead) => String(lead.id) === String(failure.leadId));
+      const snapshot = snapshots.get(String(failure.leadId));
+      if (localLead && snapshot) Object.assign(localLead, snapshot);
+      selectedLeadIds.delete(String(failure.leadId));
+    });
+    saveAll();
+    const claimedCount = (result.claimed || []).length;
+    const failedCount = (result.failed || []).length;
+    showToast(`${claimedCount} lead${claimedCount === 1 ? "" : "s"} successfully claimed and moved to My Leads${failedCount ? `; ${failedCount} could not be claimed` : ""}.`, failedCount ? "error" : "success");
+  } catch (error) {
+    eligible.forEach((lead) => Object.assign(lead, snapshots.get(String(lead.id))));
+    showToast(`Batch claim failed: ${error.message}`, "error");
+  } finally {
+    eligible.forEach((lead) => pendingLeadClaims.delete(String(lead.id)));
+    button.textContent = "Claim selected leads";
     renderAll();
   }
 }
@@ -3197,6 +3270,30 @@ function processViewLeadLink() {
 }
 
 document.addEventListener("click", (event) => {
+  const leadSelection = event.target.closest("[data-select-lead]");
+  if (leadSelection) {
+    const id = String(leadSelection.dataset.selectLead);
+    if (selectedLeadIds.has(id)) selectedLeadIds.delete(id);
+    else selectedLeadIds.add(id);
+    renderInbox();
+    return;
+  }
+
+  const selectAllVisible = event.target.closest("#selectVisibleUnclaimed");
+  if (selectAllVisible) {
+    const ids = String(selectAllVisible.dataset.visibleLeadIds || "").split(",").filter(Boolean);
+    const shouldSelect = ids.some((id) => !selectedLeadIds.has(id));
+    ids.forEach((id) => shouldSelect ? selectedLeadIds.add(id) : selectedLeadIds.delete(id));
+    renderInbox();
+    return;
+  }
+
+  const claimSelected = event.target.closest("#claimSelectedLeadsButton");
+  if (claimSelected && !claimSelected.disabled) {
+    claimSelectedLeads();
+    return;
+  }
+
   const inboxViewButton = event.target.closest("[data-inbox-view]");
   const inboxViewLink = event.target.closest("[data-inbox-view-link]");
   if (inboxViewButton || inboxViewLink) {

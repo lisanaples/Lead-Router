@@ -236,6 +236,11 @@
               <button class="inbox-view-tab" type="button" data-inbox-view="closed">Closed / final</button>
               <button class="inbox-view-tab" type="button" data-inbox-view="archive">Search archives</button>
             </div>
+            <div class="bulk-claim-bar" id="bulkClaimBar">
+              <label><input type="checkbox" id="selectVisibleUnclaimed" /> Select all unclaimed leads on this page</label>
+              <span id="selectedLeadCount">0 selected</span>
+              <button class="primary-button" type="button" id="claimSelectedLeadsButton" disabled>Claim selected leads</button>
+            </div>
             <div class="inbox-list-header" aria-hidden="true">
               <span>Lead</span><span>Status</span><span>Owner</span><span>Received</span><span>Property / source</span>
             </div>
@@ -601,14 +606,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v93.js?v=93"></script>
+    <script src="app-v94.js?v=94"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=93", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=94", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;
