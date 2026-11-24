@@ -363,7 +363,7 @@
               <div id="mySignatureUnavailable" class="form-helper hidden">Your signed-in email is not connected to a team profile yet. Ask the Lead Relay administrator to check the email address on your team record.</div>
               <div id="mySignatureFields">
                 <div class="signature-settings-grid">
-                  <label>Agent name <input id="mySignatureName" type="text" readonly /></label>
+                  <label>Agent name <input id="mySignatureName" type="text" required placeholder="First and last name" /></label>
                   <label>Email <input id="mySignatureEmail" type="email" readonly /></label>
                   <label>Phone <input id="mySignaturePhone" type="tel" placeholder="717-555-0123" /></label>
                   <label>Title <input id="mySignatureTitle" type="text" placeholder="Realtor®" /></label>
@@ -390,7 +390,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 100</strong></p>
+              <p><strong>Lead Relay version 101</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -663,14 +663,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v97.js?v=100"></script>
+    <script src="app-v97.js?v=101"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=100", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=101", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;

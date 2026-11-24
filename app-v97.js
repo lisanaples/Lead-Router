@@ -166,6 +166,7 @@ const contactAttemptLocks = new Set();
 const pendingLeadClaims = new Set();
 const selectedLeadIds = new Set();
 let claimRequestQueue = Promise.resolve();
+let pendingOwnerRename = null;
 
 team = team.map((member) => ({
   ...member,
@@ -662,6 +663,14 @@ async function syncCloudSnapshot(options = {}) {
     renderSyncStatus();
     const existingRows = await supabaseRequest(`/rest/v1/lead_router_records?id=eq.${encodeURIComponent(CLOUD_RECORD_ID)}&select=data&limit=1`);
     const existingCloudData = existingRows?.[0]?.data || {};
+    if (pendingOwnerRename?.oldName && pendingOwnerRename?.newName && existingCloudData.pushSubscriptions?.[pendingOwnerRename.oldName]) {
+      existingCloudData.pushSubscriptions = { ...existingCloudData.pushSubscriptions };
+      existingCloudData.pushSubscriptions[pendingOwnerRename.newName] = [
+        ...(existingCloudData.pushSubscriptions[pendingOwnerRename.newName] || []),
+        ...existingCloudData.pushSubscriptions[pendingOwnerRename.oldName],
+      ].filter((subscription, index, all) => all.findIndex((entry) => entry?.endpoint === subscription?.endpoint) === index).slice(0, 5);
+      delete existingCloudData.pushSubscriptions[pendingOwnerRename.oldName];
+    }
     const mergedLeads = mergeLeadSnapshots(leads, existingCloudData.leads || []);
     leads = mergedLeads;
     await supabaseRequest("/rest/v1/lead_router_records?on_conflict=id", {
@@ -674,6 +683,7 @@ async function syncCloudSnapshot(options = {}) {
       }),
     });
     saveAll();
+    pendingOwnerRename = null;
     syncState = "saved";
     lastAutoSync = new Date().toISOString();
     localStorage.setItem(LAST_AUTO_SYNC_KEY, lastAutoSync);
@@ -879,7 +889,7 @@ function fullAccessFor(member) {
 
 function applySignedInTeamAccess() {
   if (isMasterEmail()) {
-    const lisa = team.find((member) => member.name.toLowerCase() === "lisa") || team[0];
+    const lisa = teamMemberForEmail() || team.find((member) => member.name.toLowerCase() === "lisa") || team[0];
     if (lisa) {
       lisa.email = lisa.email || signedInEmail();
       lisa.accessRole = "Full access";
@@ -1794,14 +1804,15 @@ function renderMySignaturePreview() {
   const member = teamMemberForEmail();
   const preview = document.querySelector("#mySignaturePreview");
   if (!member || !preview) return;
+  const previewName = String(document.querySelector("#mySignatureName").value || member.name || "").trim();
   const photoUrl = String(document.querySelector("#mySignaturePhotoUrl").value || "").trim();
   const phone = cleanLeadPhone(document.querySelector("#mySignaturePhone").value);
   const title = String(document.querySelector("#mySignatureTitle").value || "").trim();
   const company = String(document.querySelector("#mySignatureCompany").value || "").trim();
   preview.innerHTML = `
-    ${photoUrl ? `<img src="${escapeAttr(photoUrl)}" alt="${escapeAttr(member.name)}" />` : `<span class="signature-photo-placeholder">Photo</span>`}
+    ${photoUrl ? `<img src="${escapeAttr(photoUrl)}" alt="${escapeAttr(previewName)}" />` : `<span class="signature-photo-placeholder">Photo</span>`}
     <div>
-      <strong>${escapeHtml(member.name)}</strong>
+      <strong>${escapeHtml(previewName)}</strong>
       ${title ? `<span>${escapeHtml(title)}</span>` : ""}
       ${company ? `<span>${escapeHtml(company)}</span>` : ""}
       ${phone ? `<span>${escapeHtml(phone)}</span>` : ""}
@@ -1816,13 +1827,35 @@ function saveMySignature(event) {
     showToast("Your account is not connected to a team profile yet.");
     return;
   }
+  const oldName = member.name;
+  const newName = String(document.querySelector("#mySignatureName").value || "").trim();
+  if (!newName) {
+    showToast("Enter your first and last name before saving.");
+    return;
+  }
+  const duplicateName = team.find((entry) => entry.id !== member.id && String(entry.name || "").trim().toLowerCase() === newName.toLowerCase());
+  if (duplicateName) {
+    showToast("That name is already used by another team member.");
+    return;
+  }
+  if (oldName !== newName) {
+    member.name = newName;
+    leads.forEach((lead) => {
+      if (lead.assignedTo === oldName) lead.assignedTo = newName;
+    });
+    pendingOwnerRename = { oldName, newName };
+    myOwner = newName;
+    localStorage.setItem(MY_OWNER_KEY, myOwner);
+  }
   member.phone = cleanLeadPhone(document.querySelector("#mySignaturePhone").value);
   member.signatureTitle = String(document.querySelector("#mySignatureTitle").value || "").trim();
   member.signatureCompany = String(document.querySelector("#mySignatureCompany").value || "").trim();
   member.photoUrl = String(document.querySelector("#mySignaturePhotoUrl").value || "").trim();
   saveAndSync();
   renderMySignature();
-  showToast("Your email signature was saved for future funnel emails.");
+  showToast(oldName === newName
+    ? "Your email signature was saved for future funnel emails."
+    : `Your name was updated to ${newName}, including your assigned leads and push profile.`);
 }
 
 function renderSyncStatus() {
@@ -2619,6 +2652,7 @@ function saveTeamMember(form, options = {}) {
     form.elements.teamId.value = member.id;
   }
   if (oldName && oldName !== member.name) {
+    pendingOwnerRename = { oldName, newName: member.name };
     leads.forEach((lead) => {
       if (lead.assignedTo === oldName) lead.assignedTo = member.name;
     });
