@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="assets/lead-router-icon.svg" />
     <link rel="apple-touch-icon" href="assets/lead-router-icon.svg" />
-    <link rel="stylesheet" href="styles.css?v=92" />
+    <link rel="stylesheet" href="styles.css?v=97" />
   </head>
   <body>
     <main class="app-shell">
@@ -348,6 +348,15 @@
               <label><input id="allowReclaim" type="checkbox" /> Allow admin to reassign claimed leads</label>
               <label><input id="notifyAll" type="checkbox" checked /> Notify all active team members</label>
             </div>
+            <div class="settings-card funnel-settings-card">
+              <strong>Automated lead funnels</strong>
+              <p id="funnelAutomationState">Draft mode — no automated lead emails will be sent.</p>
+              <label><input id="funnelAutomationEnabled" type="checkbox" /> Enable scheduled lead emails</label>
+              <p><strong>New lead — no response:</strong> first follow-up planned after 2 days.</p>
+              <p><strong>Engaged lead:</strong> helpful follow-up planned every 3 days.</p>
+              <p><strong>Long-term nurture:</strong> check-in planned every 14 days.</p>
+              <small>After three unanswered emails, a lead automatically moves to Long-Term Nurture and waits 14 days. Archived, do-not-contact, lost, closed, converted, opted-out, and paused leads are always excluded.</small>
+            </div>
             <div class="settings-card">
               <strong>Device alerts</strong>
               <p>Use these once on each phone or computer that should receive push notifications.</p>
@@ -359,7 +368,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 92</strong></p>
+              <p><strong>Lead Relay version 97</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -479,6 +488,28 @@
               <textarea name="forewarnNotes" placeholder="Add any details or concerns from the Forewarn search..."></textarea>
             </label>
           </div>
+        </section>
+        <section class="tracking-section funnel-section">
+          <div class="section-title">
+            <h3>Email follow-up funnel</h3>
+            <span>Automation</span>
+          </div>
+          <p id="funnelStatusSummary">Not in a funnel · Not enrolled</p>
+          <div class="form-grid funnel-fields">
+            <label>Funnel
+              <select name="funnel">
+                <option value="none">Not in a funnel</option>
+                <option value="newNoResponse">New lead — no response</option>
+                <option value="engaged">Engaged lead</option>
+                <option value="longTermNurture">Long-term nurture</option>
+              </select>
+            </label>
+            <div class="funnel-checks">
+              <label><input name="funnelPaused" type="checkbox" /> Pause automated emails</label>
+              <label><input name="emailOptOut" type="checkbox" /> Lead opted out / do not email</label>
+            </div>
+          </div>
+          <div class="notes-log" id="funnelEmailHistory"></div>
         </section>
         <label>Message <textarea name="message" placeholder="Original message or notes..."></textarea></label>
         <section class="tracking-section notes-section">
@@ -600,20 +631,24 @@
               <option>Account created</option>
             </select>
           </label>
+          <label>Signature title <input name="signatureTitle" placeholder="Realtor®" /></label>
+          <label>Signature company <input name="signatureCompany" placeholder="Berkshire Hathaway HomeServices Homesale Realty" /></label>
+          <label class="full-width">Agent photo URL <input name="photoUrl" type="url" placeholder="https://... public photo address" /></label>
         </div>
+        <p class="form-helper">Automated emails use this name, phone, email, title, company, and photo. Replies go directly to the agent’s email address.</p>
         <button class="primary-button" type="button" data-close-dialog>Done</button>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v94.js?v=94"></script>
+    <script src="app-v97.js?v=97"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=94", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=97", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;

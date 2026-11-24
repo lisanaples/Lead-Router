@@ -109,6 +109,9 @@ let syncState = "idle";
 let lastAutoSync = localStorage.getItem(LAST_AUTO_SYNC_KEY) || "";
 let passwordRecoveryMode = false;
 let sessionRefreshPromise = null;
+let cloudRefreshPromise = null;
+let authBusy = false;
+let lastCloudRefreshAt = 0;
 let sessionNeedsSignIn = false;
 let localStorageLeadSaveAvailable = true;
 let mobileAccountExpanded = false;
@@ -557,7 +560,7 @@ async function updatePassword(password) {
   showToast("Password updated. You are signed in to Lead Relay.");
 }
 
-async function refreshFromCloud(options = {}) {
+async function performRefreshFromCloud(options = {}) {
   if (!cloudSession?.access_token) {
     if (!options.silent) showToast("Sign in first to refresh cloud data.");
     return false;
@@ -584,6 +587,21 @@ async function refreshFromCloud(options = {}) {
   } catch (error) {
     if (!options.silent || sessionNeedsSignIn) showToast(`Refresh failed: ${error.message}`);
     return false;
+  }
+}
+
+async function refreshFromCloud(options = {}) {
+  if (options.silent && Date.now() - lastCloudRefreshAt < 5000) return true;
+  if (cloudRefreshPromise) return cloudRefreshPromise;
+  cloudRefreshPromise = performRefreshFromCloud(options);
+  renderSyncStatus();
+  try {
+    const refreshed = await cloudRefreshPromise;
+    if (refreshed) lastCloudRefreshAt = Date.now();
+    return refreshed;
+  } finally {
+    cloudRefreshPromise = null;
+    renderSyncStatus();
   }
 }
 
@@ -1696,7 +1714,12 @@ function renderSyncStatus() {
   document.querySelector("#authForm").classList.toggle("hidden", signedIn);
   document.querySelector("#passwordResetForm").classList.toggle("hidden", !passwordRecoveryMode);
   document.querySelector("#signOutButton").classList.toggle("hidden", !signedIn || passwordRecoveryMode);
-  document.querySelector("#refreshCloudButton").disabled = !signedIn || passwordRecoveryMode;
+  const refreshButton = document.querySelector("#refreshCloudButton");
+  refreshButton.disabled = !signedIn || passwordRecoveryMode || Boolean(cloudRefreshPromise);
+  refreshButton.textContent = cloudRefreshPromise ? "Refreshing…" : "Refresh cloud data";
+  const signInButton = document.querySelector('#authForm button[type="submit"]');
+  signInButton.disabled = authBusy;
+  signInButton.textContent = authBusy ? "Signing in…" : "Sign in";
   document.querySelector("#enablePushButton").disabled = !pushAvailable || !myOwner;
   document.querySelector("#testPushButton").disabled = !pushAvailable || !myOwner;
   const accountPanel = document.querySelector(".sync-panel");
@@ -3459,10 +3482,16 @@ document.querySelector("#authForm").addEventListener("submit", async (event) => 
     showToast("Enter an email and password.");
     return;
   }
+  if (authBusy) return;
+  authBusy = true;
+  renderSyncStatus();
   try {
     await signIn(email, password);
   } catch (error) {
     showToast(`Sign in failed: ${error.message}`);
+  } finally {
+    authBusy = false;
+    renderSyncStatus();
   }
 });
 document.querySelector("#createAccountButton").addEventListener("click", async () => {
@@ -3509,7 +3538,11 @@ document.querySelector("#passwordResetForm").addEventListener("submit", async (e
     showToast(`Password could not be updated: ${error.message}`);
   }
 });
-document.querySelector("#refreshCloudButton").addEventListener("click", () => refreshFromCloud());
+document.querySelector("#refreshCloudButton").addEventListener("click", async () => {
+  if (cloudRefreshPromise) return;
+  renderSyncStatus();
+  await refreshFromCloud();
+});
 document.querySelector("#toggleAccountPanel").addEventListener("click", () => {
   mobileAccountExpanded = !mobileAccountExpanded;
   renderSyncStatus();

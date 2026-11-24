@@ -1,0 +1,209 @@
+const crypto = require("crypto");
+const {
+  getWorkspace,
+  handleOptions,
+  optionalEnv,
+  saveWorkspace,
+} = require("./_lead-router-lib");
+
+const BLOCKED_STATUSES = new Set(["doNotContact", "archived", "lost", "closed", "converted"]);
+const MAX_EMAILS_PER_RUN = 25;
+
+function escapeHtml(value) {
+  return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+}
+
+function firstName(value) {
+  return String(value || "there").trim().split(/\s+/)[0] || "there";
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next.toISOString();
+}
+
+function signingSecret() {
+  return optionalEnv("FUNNEL_SIGNING_SECRET") || optionalEnv("SUPABASE_SERVICE_ROLE_KEY");
+}
+
+function unsubscribeToken(leadId) {
+  return crypto.createHmac("sha256", signingSecret()).update(String(leadId)).digest("hex");
+}
+
+function appUrl() {
+  return (optionalEnv("LEAD_ROUTER_APP_URL") || "https://lead-router-29yb.vercel.app").replace(/\/$/, "");
+}
+
+function unsubscribeUrl(lead) {
+  return `${appUrl()}/api/unsubscribe?lead=${encodeURIComponent(lead.id)}&token=${unsubscribeToken(lead.id)}`;
+}
+
+function senderAddress(agent) {
+  const configured = optionalEnv("EMAIL_FROM");
+  const address = configured.match(/<([^>]+)>/)?.[1] || configured;
+  return `${agent.name || "Lead Relay"} <${address}>`;
+}
+
+function safePhotoUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function signatureHtml(agent) {
+  const photo = safePhotoUrl(agent.photoUrl);
+  return `
+    <table role="presentation" style="margin-top:26px;border-top:1px solid #dfe7e9;padding-top:18px;"><tr>
+      ${photo ? `<td style="padding-right:14px;vertical-align:top;"><img src="${escapeHtml(photo)}" width="72" height="72" alt="${escapeHtml(agent.name)}" style="width:72px;height:72px;object-fit:cover;border-radius:50%;"></td>` : ""}
+      <td style="font-family:Arial,sans-serif;color:#193b4a;line-height:1.45;vertical-align:top;">
+        <strong style="font-size:17px;">${escapeHtml(agent.name)}</strong><br>
+        ${agent.signatureTitle ? `${escapeHtml(agent.signatureTitle)}<br>` : ""}
+        ${agent.signatureCompany ? `${escapeHtml(agent.signatureCompany)}<br>` : ""}
+        ${agent.phone ? `<a href="tel:${escapeHtml(agent.phone)}" style="color:#193b4a;">${escapeHtml(agent.phone)}</a><br>` : ""}
+        ${agent.email ? `<a href="mailto:${escapeHtml(agent.email)}" style="color:#193b4a;">${escapeHtml(agent.email)}</a>` : ""}
+      </td>
+    </tr></table>`;
+}
+
+function messageFor(lead, agent) {
+  const property = lead.property || "the property you asked about";
+  const area = lead.property || "your preferred area";
+  const name = firstName(lead.name);
+  const sequences = {
+    newNoResponse: [
+      {
+        subject: `Would you like to tour ${property}?`,
+        body: `Thank you for asking about ${escapeHtml(property)}. I’d be happy to answer your questions or arrange a private tour.<br><br>Would you prefer to see the home during the week or this weekend?<br><br>You can reply directly to this email${agent.phone ? ` or call or text me at ${escapeHtml(agent.phone)}` : ""}.`,
+      },
+      {
+        subject: `Following up about ${property}`,
+        body: `I wanted to follow up in case you are still interested in ${escapeHtml(property)}.<br><br>I can help you check availability, get additional property information, or schedule a showing. If that particular home isn’t the right fit, I can also help you find similar properties.<br><br>Are you still interested in taking a closer look?`,
+      },
+      {
+        subject: "Are you still looking for a home?",
+        body: `I haven’t been able to reach you, so I wanted to check in one more time.<br><br>Are you still interested in ${escapeHtml(property)}, or has your home search changed? Either answer is perfectly fine. I just don’t want you to miss the opportunity to get the information or assistance you need.<br><br>If you’re still looking, simply reply and tell me what would be most helpful.`,
+      },
+    ],
+    engaged: [
+      {
+        subject: "Next steps for your home search",
+        body: `It was great connecting with you. Based on what you shared, I’d be happy to help you with the next step in your home search.<br><br>I can help with scheduling a tour of ${escapeHtml(property)}, finding similar homes, answering neighborhood questions, or connecting you with a trusted lender if needed.<br><br>What would be most helpful right now?`,
+      },
+      {
+        subject: "A few homes you may want to consider",
+        body: `I wanted to check in and see whether you are still considering ${escapeHtml(property)} or would like to explore some similar options.<br><br>If you tell me your preferred location, price range, and must-have features, I can narrow the search and help you focus on the strongest possibilities.<br><br>Would you like me to put together a short list for you?`,
+      },
+    ],
+    longTermNurture: [
+      {
+        subject: "How is your home search going?",
+        body: `I wanted to check in and see how your home search is going.<br><br>Even if you’re not ready to make a move immediately, I’m happy to keep an eye on the market and help you understand what is available in ${escapeHtml(area)}.<br><br>Has anything changed regarding your timing, preferred area, or price range?`,
+      },
+      {
+        subject: "Would updated listings be helpful?",
+        body: `Would it be helpful if I sent you updated listings that match what you’re looking for?<br><br>I can adjust the search based on location, price range, home style, bedrooms and bathrooms, and the specific features that matter to you.<br><br>Just reply with any updates, and I’ll make sure you receive useful options rather than homes that don’t fit.`,
+      },
+    ],
+  };
+  const list = sequences[lead.funnel] || [];
+  const step = Number(lead.funnelStep || 0);
+  const message = list[lead.funnel === "longTermNurture" ? step % list.length : step];
+  if (!message) return null;
+  return {
+    ...message,
+    html: `<p>Hi ${escapeHtml(name)},</p><p style="line-height:1.65;">${message.body}</p>${signatureHtml(agent)}<p style="margin-top:28px;font-size:11px;color:#68777d;">You are receiving this because you requested real estate information. <a href="${escapeHtml(unsubscribeUrl(lead))}">Unsubscribe</a></p>`,
+  };
+}
+
+async function sendFunnelEmail(lead, agent, message) {
+  const apiKey = optionalEnv("RESEND_API_KEY");
+  const from = optionalEnv("EMAIL_FROM");
+  if (!apiKey || !from) throw new Error("RESEND_API_KEY or EMAIL_FROM is missing.");
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: senderAddress(agent),
+      to: lead.email,
+      reply_to: agent.email,
+      subject: message.subject,
+      html: `<div style="max-width:640px;margin:0 auto;padding:28px;font-family:Arial,sans-serif;color:#202a2e;">${message.html}</div>`,
+    }),
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(text || "Email send failed.");
+  try { return JSON.parse(text); } catch { return {}; }
+}
+
+function eligible(lead, now) {
+  if (!lead || !["newNoResponse", "engaged", "longTermNurture"].includes(lead.funnel)) return false;
+  if (lead.funnelPaused || lead.emailOptOut || BLOCKED_STATUSES.has(lead.status)) return false;
+  if (!lead.email || !lead.assignedTo || !lead.nextAutomatedEmailAt) return false;
+  return new Date(lead.nextAutomatedEmailAt).getTime() <= now.getTime();
+}
+
+function recordSuccess(lead, message, result, now) {
+  lead.automationHistory = Array.isArray(lead.automationHistory) ? lead.automationHistory : [];
+  lead.activity = Array.isArray(lead.activity) ? lead.activity : [];
+  lead.automationHistory.unshift({ at: now.toISOString(), text: `Sent “${message.subject}” from ${lead.assignedTo}.`, providerId: result.id || "" });
+  lead.automationHistory = lead.automationHistory.slice(0, 50);
+  lead.activity.unshift({ at: now.toISOString(), text: `Automated funnel email sent: ${message.subject}` });
+  lead.updatedAt = now.toISOString();
+  const step = Number(lead.funnelStep || 0);
+  if (lead.funnel === "newNoResponse" && step >= 2) {
+    lead.funnel = "longTermNurture";
+    lead.funnelStep = 0;
+    lead.funnelStartedAt = now.toISOString();
+    lead.nextAutomatedEmailAt = addDays(now, 14);
+    lead.activity.unshift({ at: now.toISOString(), text: "No response after three emails. Automatically moved to Long-Term Nurture." });
+  } else if (lead.funnel === "engaged" && step >= 1) {
+    lead.funnelStep = 2;
+    lead.funnelPaused = true;
+    lead.nextAutomatedEmailAt = "";
+    lead.activity.unshift({ at: now.toISOString(), text: "Engaged sequence completed and paused for personal follow-up." });
+  } else {
+    lead.funnelStep = step + 1;
+    const waitDays = lead.funnel === "newNoResponse" ? (step === 0 ? 3 : 5) : lead.funnel === "engaged" ? 3 : 14;
+    lead.nextAutomatedEmailAt = addDays(now, waitDays);
+  }
+}
+
+module.exports = async function handler(request, response) {
+  if (handleOptions(request, response)) return;
+  if (request.method !== "GET" && request.method !== "POST") return response.status(405).json({ error: "Method not allowed" });
+  const cronSecret = optionalEnv("CRON_SECRET");
+  if (!cronSecret || request.headers.authorization !== `Bearer ${cronSecret}`) return response.status(401).json({ error: "Unauthorized" });
+
+  const workspace = await getWorkspace();
+  if (!workspace.settings?.funnelAutomationEnabled) return response.status(200).json({ ok: true, sent: 0, message: "Funnel automation is disabled." });
+  const now = new Date();
+  const due = (workspace.leads || []).filter((lead) => eligible(lead, now)).slice(0, MAX_EMAILS_PER_RUN);
+  const results = [];
+  for (const lead of due) {
+    const agent = (workspace.team || []).find((member) => member.name === lead.assignedTo);
+    if (!agent?.email) {
+      results.push({ leadId: lead.id, sent: false, error: "Assigned agent email is missing." });
+      continue;
+    }
+    const message = messageFor(lead, agent);
+    if (!message) {
+      results.push({ leadId: lead.id, sent: false, error: "No email remains in this sequence." });
+      continue;
+    }
+    try {
+      const providerResult = await sendFunnelEmail(lead, agent, message);
+      recordSuccess(lead, message, providerResult, now);
+      results.push({ leadId: lead.id, sent: true, subject: message.subject });
+    } catch (error) {
+      lead.automationHistory = Array.isArray(lead.automationHistory) ? lead.automationHistory : [];
+      lead.automationHistory.unshift({ at: now.toISOString(), text: `Email failed: ${error.message}` });
+      results.push({ leadId: lead.id, sent: false, error: error.message });
+    }
+  }
+  if (due.length) await saveWorkspace(workspace);
+  response.status(200).json({ ok: true, due: due.length, sent: results.filter((item) => item.sent).length, results });
+};
