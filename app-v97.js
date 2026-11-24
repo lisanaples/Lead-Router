@@ -87,37 +87,45 @@ const FUNNELS = {
   none: { label: "Not in a funnel", delayDays: 0 },
   newNoResponse: { label: "New lead — no response", delayDays: 2 },
   engaged: { label: "Engaged lead", delayDays: 3 },
-  longTermNurture: { label: "Long-term nurture", delayDays: 14 },
+  longTermNurture: { label: "Long-term nurture", delayDays: 28 },
 };
 
 const FUNNEL_EMAIL_PREVIEWS = {
   newNoResponse: {
     label: "New lead — no response",
-    timing: ["2 days after enrollment", "3 days after the first email", "5 days after the second email"],
+    timing: ["2 days after enrollment", "3 days after the first email", "4 days after the second email", "5 days after the third email"],
     emails: [
       { subject: "Would you like to tour [property]?", body: "Thank you for asking about [property]. I’d be happy to answer your questions or arrange a private tour.\n\nWould you prefer to see the home during the week or this weekend?\n\nYou can reply directly to this email or call or text me." },
       { subject: "Following up about [property]", body: "I wanted to follow up in case you are still interested in [property].\n\nI can help you check availability, get additional property information, or schedule a showing. If that particular home isn’t the right fit, I can also help you find similar properties.\n\nAre you still interested in taking a closer look?" },
       { subject: "Are you still looking for a home?", body: "I haven’t been able to reach you, so I wanted to check in one more time.\n\nAre you still interested in [property], or has your home search changed? Either answer is perfectly fine. I just don’t want you to miss the opportunity to get the information or assistance you need.\n\nIf you’re still looking, simply reply and tell me what would be most helpful." },
+      { subject: "Should I close the loop on [property]?", body: "I wanted to make one final check-in about [property].\n\nIf you would still like details, a private tour, or similar homes, I’m happy to help. If your plans have changed, no problem at all.\n\nJust reply with what you would prefer, and I’ll follow your lead." },
     ],
-    after: "After the third unanswered email, the lead moves to Long-Term Nurture and waits 14 days.",
+    after: "After the fourth unanswered email, the lead moves to Long-Term Nurture and waits 28 days.",
   },
   engaged: {
     label: "Engaged lead",
-    timing: ["3 days after enrollment", "3 days after the first email"],
+    timing: ["3 days after enrollment", "4 days after the first email", "7 days after the second email"],
     emails: [
       { subject: "Next steps for your home search", body: "It was great connecting with you. Based on what you shared, I’d be happy to help you with the next step in your home search.\n\nI can help with scheduling a tour of [property], finding similar homes, answering neighborhood questions, or connecting you with a trusted lender if needed.\n\nWhat would be most helpful right now?" },
       { subject: "A few homes you may want to consider", body: "I wanted to check in and see whether you are still considering [property] or would like to explore some similar options.\n\nIf you tell me your preferred location, price range, and must-have features, I can narrow the search and help you focus on the strongest possibilities.\n\nWould you like me to put together a short list for you?" },
+      { subject: "Would a quick home-search planning call help?", body: "I’d be glad to help you organize the next steps in your home search.\n\nA short call can help us review your timing, financing, preferred areas, and the features that matter most so I can focus on the best options for you.\n\nWould you like to choose a convenient time to talk?" },
     ],
-    after: "After the second email, this funnel pauses for personal follow-up.",
+    after: "After the third email, this funnel pauses for personal follow-up.",
   },
   longTermNurture: {
     label: "Long-term nurture",
-    timing: ["14 days after enrollment", "Every 14 days afterward"],
+    timing: ["28 days after enrollment", "28 days after email 1", "28 days after email 2", "28 days after email 3", "28 days after email 4", "28 days after email 5", "28 days after email 6", "28 days after email 7"],
     emails: [
       { subject: "How is your home search going?", body: "I wanted to check in and see how your home search is going.\n\nEven if you’re not ready to make a move immediately, I’m happy to keep an eye on the market and help you understand what is available in [property or area].\n\nHas anything changed regarding your timing, preferred area, or price range?" },
       { subject: "Would updated listings be helpful?", body: "Would it be helpful if I sent you updated listings that match what you’re looking for?\n\nI can adjust the search based on location, price range, home style, bedrooms and bathrooms, and the specific features that matter to you.\n\nJust reply with any updates, and I’ll make sure you receive useful options rather than homes that don’t fit." },
+      { subject: "Have your preferred areas changed?", body: "As your plans develop, your preferred areas may change too.\n\nIf you would like, I can help compare neighborhoods, commute considerations, property taxes, and the types of homes available in different locations.\n\nAre there any areas you would like to add or remove from your search?" },
+      { subject: "A quick financing check-in", body: "Financing options and monthly-payment goals can shape which homes make the most sense.\n\nIf you need an updated preapproval or would like to speak with a trusted lender, I can help make that connection. There is no obligation—this is simply a way to make your search more focused when you are ready.\n\nWould a lender introduction be helpful?" },
+      { subject: "What features matter most now?", body: "I wanted to make sure I’m watching for homes that truly fit your needs.\n\nHave any of your must-have features changed—such as location, bedrooms, first-floor living, outdoor space, garage size, or condition?\n\nReply with your top priorities, and I can refine the options I send you." },
+      { subject: "Would you like help planning home tours?", body: "When you are ready to tour homes, I can help organize the appointments so you can compare the strongest options efficiently.\n\nIf there are properties you have saved or neighborhoods you want to explore, send them my way and I’ll help with availability and scheduling.\n\nWould you like to plan a tour day?" },
+      { subject: "Has your moving timeline changed?", body: "I know moving plans can change, so I wanted to check on your timing.\n\nWhether you hope to move soon, later this year, or are simply gathering information, knowing your approximate timeline helps me provide more useful guidance.\n\nHas anything changed with your plans?" },
+      { subject: "Would you still like real estate updates?", body: "I want to make sure the information I send remains useful to you.\n\nWould you still like occasional listings and real estate updates, or would you prefer that I pause for now? Either choice is completely fine.\n\nJust reply and let me know what works best for you." },
     ],
-    after: "These two check-ins repeat every 14 days until the funnel is paused or stopped.",
+    after: "The eight-email series repeats every 28 days until the funnel is paused or stopped.",
   },
 };
 
