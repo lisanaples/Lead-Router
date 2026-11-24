@@ -365,7 +365,8 @@
                 <div class="signature-settings-grid">
                   <label>Agent name <input id="mySignatureName" type="text" required placeholder="First and last name" /></label>
                   <label>Email <input id="mySignatureEmail" type="email" readonly /></label>
-                  <label>Phone <input id="mySignaturePhone" type="tel" placeholder="717-555-0123" /></label>
+                  <label>Mobile phone <input id="mySignaturePhone" type="tel" placeholder="717-555-0123" /></label>
+                  <label>Office phone <input id="mySignatureOfficePhone" type="tel" placeholder="717-555-0100" /></label>
                   <label>Title <input id="mySignatureTitle" type="text" placeholder="Realtor®" /></label>
                   <label class="full-width">Company <input id="mySignatureCompany" type="text" placeholder="Berkshire Hathaway HomeServices Homesale Realty" /></label>
                   <label class="full-width">Agent photo URL <input id="mySignaturePhotoUrl" type="url" placeholder="https://... public photo address" /></label>
@@ -390,7 +391,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 101</strong></p>
+              <p><strong>Lead Relay version 102</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -629,6 +630,7 @@
         <div class="form-grid">
           <label>Name <input name="name" required placeholder="Agent name" /></label>
           <label>Cell phone <input name="phone" placeholder="Text number" /></label>
+          <label>Office phone <input name="officePhone" placeholder="Office number" /></label>
           <label>Email <input name="email" type="email" placeholder="Email" /></label>
           <label>App access
             <select name="accessRole">
@@ -657,20 +659,20 @@
           <label>Signature company <input name="signatureCompany" placeholder="Berkshire Hathaway HomeServices Homesale Realty" /></label>
           <label class="full-width">Agent photo URL <input name="photoUrl" type="url" placeholder="https://... public photo address" /></label>
         </div>
-        <p class="form-helper">Automated emails use this name, phone, email, title, company, and photo. Replies go directly to the agent’s email address.</p>
+        <p class="form-helper">Automated emails use this name, mobile and office numbers, email, title, company, and photo. Replies go directly to the agent’s email address.</p>
         <button class="primary-button" type="button" data-close-dialog>Done</button>
       </form>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v97.js?v=101"></script>
+    <script src="app-v97.js?v=102"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=101", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=102", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;

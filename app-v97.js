@@ -1765,7 +1765,8 @@ function renderFunnelEmailPreviews() {
       <div><strong>${escapeHtml(member.name)}</strong>
       ${member.signatureTitle ? `<span>${escapeHtml(member.signatureTitle)}</span>` : ""}
       ${member.signatureCompany ? `<span>${escapeHtml(member.signatureCompany)}</span>` : ""}
-      ${member.phone ? `<span>${escapeHtml(member.phone)}</span>` : ""}
+      ${member.phone ? `<span>Mobile: ${escapeHtml(member.phone)}</span>` : ""}
+      ${member.officePhone ? `<span>Office: ${escapeHtml(member.officePhone)}</span>` : ""}
       ${member.email ? `<span>${escapeHtml(member.email)}</span>` : ""}</div>
     </div>` : `<p class="form-helper">Sign in with a connected team account to preview your personal signature.</p>`;
   container.innerHTML = Object.values(FUNNEL_EMAIL_PREVIEWS).map((funnel, funnelIndex) => `
@@ -1794,6 +1795,7 @@ function renderMySignature() {
   document.querySelector("#mySignatureName").value = member.name || "";
   document.querySelector("#mySignatureEmail").value = member.email || signedInEmail();
   document.querySelector("#mySignaturePhone").value = member.phone || "";
+  document.querySelector("#mySignatureOfficePhone").value = member.officePhone || "";
   document.querySelector("#mySignatureTitle").value = member.signatureTitle || "Realtor®";
   document.querySelector("#mySignatureCompany").value = member.signatureCompany || "Berkshire Hathaway HomeServices Homesale Realty";
   document.querySelector("#mySignaturePhotoUrl").value = member.photoUrl || "";
@@ -1807,6 +1809,7 @@ function renderMySignaturePreview() {
   const previewName = String(document.querySelector("#mySignatureName").value || member.name || "").trim();
   const photoUrl = String(document.querySelector("#mySignaturePhotoUrl").value || "").trim();
   const phone = cleanLeadPhone(document.querySelector("#mySignaturePhone").value);
+  const officePhone = cleanLeadPhone(document.querySelector("#mySignatureOfficePhone").value);
   const title = String(document.querySelector("#mySignatureTitle").value || "").trim();
   const company = String(document.querySelector("#mySignatureCompany").value || "").trim();
   preview.innerHTML = `
@@ -1815,7 +1818,8 @@ function renderMySignaturePreview() {
       <strong>${escapeHtml(previewName)}</strong>
       ${title ? `<span>${escapeHtml(title)}</span>` : ""}
       ${company ? `<span>${escapeHtml(company)}</span>` : ""}
-      ${phone ? `<span>${escapeHtml(phone)}</span>` : ""}
+      ${phone ? `<span>Mobile: ${escapeHtml(phone)}</span>` : ""}
+      ${officePhone ? `<span>Office: ${escapeHtml(officePhone)}</span>` : ""}
       <span>${escapeHtml(member.email || signedInEmail())}</span>
     </div>`;
 }
@@ -1848,6 +1852,7 @@ function saveMySignature(event) {
     localStorage.setItem(MY_OWNER_KEY, myOwner);
   }
   member.phone = cleanLeadPhone(document.querySelector("#mySignaturePhone").value);
+  member.officePhone = cleanLeadPhone(document.querySelector("#mySignatureOfficePhone").value);
   member.signatureTitle = String(document.querySelector("#mySignatureTitle").value || "").trim();
   member.signatureCompany = String(document.querySelector("#mySignatureCompany").value || "").trim();
   member.photoUrl = String(document.querySelector("#mySignaturePhotoUrl").value || "").trim();
@@ -2610,6 +2615,7 @@ function fillTeamForm(member = {}) {
   form.elements.teamId.value = member.id || "";
   form.elements.name.value = member.name || "";
   form.elements.phone.value = member.phone || "";
+  form.elements.officePhone.value = member.officePhone || "";
   form.elements.email.value = member.email || "";
   form.elements.accessRole.value = member.accessRole || "Team member";
   form.elements.status.innerHTML = teamStatusOptions(teamMemberStatus(member));
@@ -2637,6 +2643,7 @@ function saveTeamMember(form, options = {}) {
     id: existing?.id || Date.now(),
     name: String(data.get("name") || "").trim() || "New team member",
     phone: cleanLeadPhone(data.get("phone")),
+    officePhone: cleanLeadPhone(data.get("officePhone")),
     email: String(data.get("email") || "").trim(),
     accessRole: String(data.get("accessRole") || "Team member"),
     status: String(data.get("status") || "Available"),
