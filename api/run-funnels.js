@@ -88,7 +88,8 @@ function signatureHtml(agent) {
         <strong style="font-size:17px;">${escapeHtml(agent.name)}</strong><br>
         ${agent.signatureTitle ? `${escapeHtml(agent.signatureTitle)}<br>` : ""}
         ${agent.signatureCompany ? `${escapeHtml(agent.signatureCompany)}<br>` : ""}
-        ${agent.phone ? `<a href="tel:${escapeHtml(agent.phone)}" style="color:#193b4a;">${escapeHtml(agent.phone)}</a><br>` : ""}
+        ${agent.phone ? `Mobile: <a href="tel:${escapeHtml(agent.phone)}" style="color:#193b4a;">${escapeHtml(agent.phone)}</a><br>` : ""}
+        ${agent.officePhone ? `Office: <a href="tel:${escapeHtml(agent.officePhone)}" style="color:#193b4a;">${escapeHtml(agent.officePhone)}</a><br>` : ""}
         ${agent.email ? `<a href="mailto:${escapeHtml(agent.email)}" style="color:#193b4a;">${escapeHtml(agent.email)}</a>` : ""}
       </td>
     </tr></table>`;
