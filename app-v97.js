@@ -1702,6 +1702,58 @@ function renderSettings() {
   document.querySelector("#funnelAutomationState").textContent = settings.funnelAutomationEnabled
     ? "Enabled — due emails may be sent by the scheduled email service."
     : "Draft mode — no automated lead emails will be sent.";
+  renderMySignature();
+}
+
+function renderMySignature() {
+  const member = teamMemberForEmail();
+  const unavailable = document.querySelector("#mySignatureUnavailable");
+  const fields = document.querySelector("#mySignatureFields");
+  unavailable.classList.toggle("hidden", Boolean(member));
+  fields.classList.toggle("hidden", !member);
+  if (!member) return;
+  document.querySelector("#mySignatureName").value = member.name || "";
+  document.querySelector("#mySignatureEmail").value = member.email || signedInEmail();
+  document.querySelector("#mySignaturePhone").value = member.phone || "";
+  document.querySelector("#mySignatureTitle").value = member.signatureTitle || "Realtor®";
+  document.querySelector("#mySignatureCompany").value = member.signatureCompany || "Berkshire Hathaway HomeServices Homesale Realty";
+  document.querySelector("#mySignaturePhotoUrl").value = member.photoUrl || "";
+  renderMySignaturePreview();
+}
+
+function renderMySignaturePreview() {
+  const member = teamMemberForEmail();
+  const preview = document.querySelector("#mySignaturePreview");
+  if (!member || !preview) return;
+  const photoUrl = String(document.querySelector("#mySignaturePhotoUrl").value || "").trim();
+  const phone = cleanLeadPhone(document.querySelector("#mySignaturePhone").value);
+  const title = String(document.querySelector("#mySignatureTitle").value || "").trim();
+  const company = String(document.querySelector("#mySignatureCompany").value || "").trim();
+  preview.innerHTML = `
+    ${photoUrl ? `<img src="${escapeAttr(photoUrl)}" alt="${escapeAttr(member.name)}" />` : `<span class="signature-photo-placeholder">Photo</span>`}
+    <div>
+      <strong>${escapeHtml(member.name)}</strong>
+      ${title ? `<span>${escapeHtml(title)}</span>` : ""}
+      ${company ? `<span>${escapeHtml(company)}</span>` : ""}
+      ${phone ? `<span>${escapeHtml(phone)}</span>` : ""}
+      <span>${escapeHtml(member.email || signedInEmail())}</span>
+    </div>`;
+}
+
+function saveMySignature(event) {
+  event.preventDefault();
+  const member = teamMemberForEmail();
+  if (!member) {
+    showToast("Your account is not connected to a team profile yet.");
+    return;
+  }
+  member.phone = cleanLeadPhone(document.querySelector("#mySignaturePhone").value);
+  member.signatureTitle = String(document.querySelector("#mySignatureTitle").value || "").trim();
+  member.signatureCompany = String(document.querySelector("#mySignatureCompany").value || "").trim();
+  member.photoUrl = String(document.querySelector("#mySignaturePhotoUrl").value || "").trim();
+  saveAndSync();
+  renderMySignature();
+  showToast("Your email signature was saved for future funnel emails.");
 }
 
 function renderSyncStatus() {
@@ -3647,6 +3699,8 @@ document.querySelector("#funnelAutomationEnabled").addEventListener("change", (e
     ? "Funnel scheduling enabled. Emails will send only after the scheduled service is connected."
     : "Automated lead emails paused for the whole team.");
 });
+document.querySelector("#mySignatureForm").addEventListener("submit", saveMySignature);
+document.querySelector("#mySignatureForm").addEventListener("input", renderMySignaturePreview);
 
 const authCallback = processAuthCallback();
 renderAll();
