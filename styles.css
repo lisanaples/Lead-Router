@@ -1870,9 +1870,97 @@ textarea {
   color: var(--muted);
 }
 
+.funnel-preview-list,
+.funnel-preview-sequence {
+  display: grid;
+  gap: 12px;
+}
+
+.funnel-preview-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.funnel-preview-group summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px;
+  cursor: pointer;
+  color: var(--navy);
+  font-weight: 900;
+  background: rgba(223, 236, 239, 0.58);
+}
+
+.funnel-preview-group summary span,
+.funnel-email-preview-heading span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.funnel-preview-sequence {
+  padding: 12px;
+}
+
+.funnel-email-preview {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(22, 61, 78, 0.14);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.funnel-email-preview-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.funnel-email-body {
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.funnel-preview-signature {
+  display: flex;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.funnel-preview-signature img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.funnel-preview-signature div {
+  display: grid;
+  gap: 1px;
+}
+
+.funnel-preview-signature span {
+  color: var(--muted);
+}
+
+.funnel-preview-after {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 239, 185, 0.52);
+}
+
 @media (max-width: 720px) {
   .signature-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .funnel-email-preview-heading {
+    display: grid;
   }
 }
 

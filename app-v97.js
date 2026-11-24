@@ -90,6 +90,37 @@ const FUNNELS = {
   longTermNurture: { label: "Long-term nurture", delayDays: 14 },
 };
 
+const FUNNEL_EMAIL_PREVIEWS = {
+  newNoResponse: {
+    label: "New lead — no response",
+    timing: ["2 days after enrollment", "3 days after the first email", "5 days after the second email"],
+    emails: [
+      { subject: "Would you like to tour [property]?", body: "Thank you for asking about [property]. I’d be happy to answer your questions or arrange a private tour.\n\nWould you prefer to see the home during the week or this weekend?\n\nYou can reply directly to this email or call or text me." },
+      { subject: "Following up about [property]", body: "I wanted to follow up in case you are still interested in [property].\n\nI can help you check availability, get additional property information, or schedule a showing. If that particular home isn’t the right fit, I can also help you find similar properties.\n\nAre you still interested in taking a closer look?" },
+      { subject: "Are you still looking for a home?", body: "I haven’t been able to reach you, so I wanted to check in one more time.\n\nAre you still interested in [property], or has your home search changed? Either answer is perfectly fine. I just don’t want you to miss the opportunity to get the information or assistance you need.\n\nIf you’re still looking, simply reply and tell me what would be most helpful." },
+    ],
+    after: "After the third unanswered email, the lead moves to Long-Term Nurture and waits 14 days.",
+  },
+  engaged: {
+    label: "Engaged lead",
+    timing: ["3 days after enrollment", "3 days after the first email"],
+    emails: [
+      { subject: "Next steps for your home search", body: "It was great connecting with you. Based on what you shared, I’d be happy to help you with the next step in your home search.\n\nI can help with scheduling a tour of [property], finding similar homes, answering neighborhood questions, or connecting you with a trusted lender if needed.\n\nWhat would be most helpful right now?" },
+      { subject: "A few homes you may want to consider", body: "I wanted to check in and see whether you are still considering [property] or would like to explore some similar options.\n\nIf you tell me your preferred location, price range, and must-have features, I can narrow the search and help you focus on the strongest possibilities.\n\nWould you like me to put together a short list for you?" },
+    ],
+    after: "After the second email, this funnel pauses for personal follow-up.",
+  },
+  longTermNurture: {
+    label: "Long-term nurture",
+    timing: ["14 days after enrollment", "Every 14 days afterward"],
+    emails: [
+      { subject: "How is your home search going?", body: "I wanted to check in and see how your home search is going.\n\nEven if you’re not ready to make a move immediately, I’m happy to keep an eye on the market and help you understand what is available in [property or area].\n\nHas anything changed regarding your timing, preferred area, or price range?" },
+      { subject: "Would updated listings be helpful?", body: "Would it be helpful if I sent you updated listings that match what you’re looking for?\n\nI can adjust the search based on location, price range, home style, bedrooms and bathrooms, and the specific features that matter to you.\n\nJust reply with any updates, and I’ll make sure you receive useful options rather than homes that don’t fit." },
+    ],
+    after: "These two check-ins repeat every 14 days until the funnel is paused or stopped.",
+  },
+};
+
 // Never fall back to the old demonstration workspace. If this device has no
 // local snapshot, keep the screen empty until the saved Supabase workspace is
 // restored after sign-in.
@@ -1700,9 +1731,39 @@ function renderSettings() {
   document.querySelector("#notifyAll").checked = settings.notifyAll;
   document.querySelector("#funnelAutomationEnabled").checked = Boolean(settings.funnelAutomationEnabled);
   document.querySelector("#funnelAutomationState").textContent = settings.funnelAutomationEnabled
-    ? "Enabled — due emails may be sent by the scheduled email service."
+    ? "Enabled — enrolled leads will receive emails when their scheduled dates arrive."
     : "Draft mode — no automated lead emails will be sent.";
   renderMySignature();
+  renderFunnelEmailPreviews();
+}
+
+function renderFunnelEmailPreviews() {
+  const container = document.querySelector("#funnelEmailPreviews");
+  if (!container) return;
+  const member = teamMemberForEmail();
+  const signature = member ? `
+    <div class="funnel-preview-signature">
+      ${member.photoUrl ? `<img src="${escapeAttr(member.photoUrl)}" alt="${escapeAttr(member.name)}" />` : ""}
+      <div><strong>${escapeHtml(member.name)}</strong>
+      ${member.signatureTitle ? `<span>${escapeHtml(member.signatureTitle)}</span>` : ""}
+      ${member.signatureCompany ? `<span>${escapeHtml(member.signatureCompany)}</span>` : ""}
+      ${member.phone ? `<span>${escapeHtml(member.phone)}</span>` : ""}
+      ${member.email ? `<span>${escapeHtml(member.email)}</span>` : ""}</div>
+    </div>` : `<p class="form-helper">Sign in with a connected team account to preview your personal signature.</p>`;
+  container.innerHTML = Object.values(FUNNEL_EMAIL_PREVIEWS).map((funnel, funnelIndex) => `
+    <details class="funnel-preview-group" ${funnelIndex === 0 ? "open" : ""}>
+      <summary>${escapeHtml(funnel.label)} <span>${funnel.emails.length} emails</span></summary>
+      <div class="funnel-preview-sequence">
+        ${funnel.emails.map((email, index) => `
+          <article class="funnel-email-preview">
+            <div class="funnel-email-preview-heading"><strong>Email ${index + 1}</strong><span>${escapeHtml(funnel.timing[index] || "")}</span></div>
+            <p><strong>Subject:</strong> ${escapeHtml(email.subject)}</p>
+            <div class="funnel-email-body">${escapeHtml(email.body).replaceAll("\n", "<br>")}</div>
+            ${signature}
+          </article>`).join("")}
+        <p class="funnel-preview-after"><strong>What happens next:</strong> ${escapeHtml(funnel.after)}</p>
+      </div>
+    </details>`).join("");
 }
 
 function renderMySignature() {
@@ -3696,7 +3757,7 @@ document.querySelector("#funnelAutomationEnabled").addEventListener("change", (e
   saveAndSync();
   renderSettings();
   showToast(event.target.checked
-    ? "Funnel scheduling enabled. Emails will send only after the scheduled service is connected."
+    ? "Funnel scheduling enabled. Enrolled leads will receive emails on their scheduled dates."
     : "Automated lead emails paused for the whole team.");
 });
 document.querySelector("#mySignatureForm").addEventListener("submit", saveMySignature);

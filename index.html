@@ -351,7 +351,7 @@
             <div class="settings-card funnel-settings-card">
               <strong>Automated lead funnels</strong>
               <p id="funnelAutomationState">Draft mode — no automated lead emails will be sent.</p>
-              <label><input id="funnelAutomationEnabled" type="checkbox" /> Enable scheduled lead emails</label>
+              <label class="master-only"><input id="funnelAutomationEnabled" type="checkbox" /> Enable scheduled lead emails for the team</label>
               <p><strong>New lead — no response:</strong> first follow-up planned after 2 days.</p>
               <p><strong>Engaged lead:</strong> helpful follow-up planned every 3 days.</p>
               <p><strong>Long-term nurture:</strong> check-in planned every 14 days.</p>
@@ -374,6 +374,11 @@
                 <button class="primary-button small-button" type="submit">Save my signature</button>
               </div>
             </form>
+            <div class="settings-card funnel-preview-settings-card">
+              <strong>Preview funnel emails</strong>
+              <p>Review the approved messages, timing, and your signature before enrolling a lead.</p>
+              <div class="funnel-preview-list" id="funnelEmailPreviews"></div>
+            </div>
             <div class="settings-card">
               <strong>Device alerts</strong>
               <p>Use these once on each phone or computer that should receive push notifications.</p>
@@ -385,7 +390,7 @@
             </div>
             <div class="settings-card">
               <strong>Data tools</strong>
-              <p><strong>Lead Relay version 98</strong></p>
+              <p><strong>Lead Relay version 99</strong></p>
               <p>Use these only when you need a backup, restore, or FiveStreet import.</p>
               <label class="master-only">Assign FiveStreet import to
                 <select id="csvImportOwner">
@@ -658,14 +663,14 @@
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app-v97.js?v=98"></script>
+    <script src="app-v97.js?v=99"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         let refreshing = false;
         const activateWaitingWorker = (registration) => {
           if (registration?.waiting) registration.waiting.postMessage({ type: "SKIP_WAITING" });
         };
-        navigator.serviceWorker.register("service-worker.js?v=98", { updateViaCache: "none" }).then((registration) => {
+        navigator.serviceWorker.register("service-worker.js?v=99", { updateViaCache: "none" }).then((registration) => {
           activateWaitingWorker(registration);
           registration.addEventListener("updatefound", () => {
             const worker = registration.installing;
