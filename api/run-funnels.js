@@ -36,7 +36,32 @@ function appUrl() {
 }
 
 function unsubscribeUrl(lead) {
-  return `${appUrl()}/api/unsubscribe?lead=${encodeURIComponent(lead.id)}&token=${unsubscribeToken(lead.id)}`;
+  return `${appUrl()}/api/run-funnels?action=unsubscribe&lead=${encodeURIComponent(lead.id)}&token=${unsubscribeToken(lead.id)}`;
+}
+
+function unsubscribePage(response, status, title, message) {
+  response.status(status).setHeader("Content-Type", "text/html; charset=utf-8");
+  response.end(`<main style="max-width:620px;margin:70px auto;padding:30px;font-family:Arial,sans-serif;color:#183b4a;"><h1>${title}</h1><p style="font-size:18px;line-height:1.6;">${message}</p></main>`);
+}
+
+async function handleUnsubscribe(request, response) {
+  const leadId = String(request.query?.lead || "");
+  const token = String(request.query?.token || "");
+  const expected = unsubscribeToken(leadId);
+  if (!leadId || token.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected))) {
+    return unsubscribePage(response, 400, "This link could not be verified", "Please contact the agent who emailed you if you would like to stop receiving messages.");
+  }
+  const workspace = await getWorkspace();
+  const lead = (workspace.leads || []).find((entry) => String(entry.id) === leadId);
+  if (!lead) return unsubscribePage(response, 404, "Lead not found", "No email preferences were changed.");
+  lead.emailOptOut = true;
+  lead.funnelPaused = true;
+  lead.nextAutomatedEmailAt = "";
+  lead.updatedAt = new Date().toISOString();
+  lead.activity = Array.isArray(lead.activity) ? lead.activity : [];
+  lead.activity.unshift({ at: lead.updatedAt, text: "Lead unsubscribed from automated email follow-up." });
+  await saveWorkspace(workspace);
+  return unsubscribePage(response, 200, "You have been unsubscribed", "You will not receive any more automated Lead Relay follow-up emails.");
 }
 
 function senderAddress(agent) {
@@ -174,6 +199,7 @@ function recordSuccess(lead, message, result, now) {
 
 module.exports = async function handler(request, response) {
   if (handleOptions(request, response)) return;
+  if (request.method === "GET" && request.query?.action === "unsubscribe") return handleUnsubscribe(request, response);
   if (request.method !== "GET" && request.method !== "POST") return response.status(405).json({ error: "Method not allowed" });
   const cronSecret = optionalEnv("CRON_SECRET");
   if (!cronSecret || request.headers.authorization !== `Bearer ${cronSecret}`) return response.status(401).json({ error: "Unauthorized" });
